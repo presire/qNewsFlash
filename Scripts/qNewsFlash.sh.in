@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+
+appname="qNewsFlash"
+
+# use -f to make the readlink path absolute
+dirname="$(dirname -- "$(readlink -f -- "${0}")" )"
+
+if [ "$dirname" = "." ]; then
+    dirname="$PWD/$dirname"
+fi
+
+cd $dirname
+
+# Initialize interpreter path
+export LD_LIBRARY_PATH="@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@/Qt:$LD_LIBRARY_PATH"
+
+# Run qNewsFlash binary
+"$dirname/$appname" "$@" 

@@ -1,0 +1,32 @@
+{
+    "api": "",
+    "asahi": false,
+    "cnet": true,
+    "exclude": [
+        "Kbc.co.jp",
+        "Sponichi.co.jp",
+        "Bunshun.jp",
+        "Famitsu.com",
+        "Sma.co.jp",
+        "Oricon.co.jp",
+        "Jleague.jp",
+        "YouTube"
+    ],
+    "hanj": false,
+    "interval": "1800",
+    "jiji": true,
+    "kyodo": true,
+    "logfile": "/var/log/qNewsFlash_log.json",
+    "maxpara": "100",
+    "newsapi": false,
+    "update": "",
+    "writefile": "/tmp/qNewsFlashWrite.json",
+    "requesturl": "",
+    "subject": "",
+    "from": "",
+    "mail": "",
+    "bbs": "",
+    "time": "",
+    "key": "",
+    "shiftjis": true
+}
