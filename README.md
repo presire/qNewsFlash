@@ -88,15 +88,15 @@ Ninjaを使用する場合は、<code>cmake</code>コマンドに<code>-G Ninja<
 * <code>CMAKE_BUILD_TYPE</code>  
   デフォルト値 : <code>Release</code>  
   リリースビルドまたはデバッグビルドを指定します。  
-<br>
+  <br>
 * <code>CMAKE_INSTALL_PREFIX</code>  
   デフォルト値 : <code>/usr/local</code>  
   qNewsFlashおよびqNewsFlash.shのインストールディレクトリを変更することができます。  
-<br>
+  <br>
 * <code>SYSCONF_DIR</code>  
   デフォルト値 : <code>/etc/qNewsFlash/qNewsFlash.json</code>  
   設定ファイル qNewsFlash.jsonのインストールディレクトリを変更することができます。  
-<br>
+  <br>
 * <code>SYSTEMD</code>  
   デフォルト値 : <code>OFF</code>  (無効 : Systemdサービスファイルはインストールされない)  
   <br>
@@ -104,12 +104,12 @@ Ninjaを使用する場合は、<code>cmake</code>コマンドに<code>-G Ninja<
   指定できる値 2 : <code>user</code>を指定する場合 - <code>~/.config/systemd/user</code>  
   <br>
   Systemdサービスファイル qNewsFlash.serviceのインストールディレクトリを変更することができます。  
-<br>
+  <br>
 * <code>PID</code>  
   デフォルト値 : <code>/var/run</code>  
   Systemdサービスを使用する場合、プロセスファイル qNewsFlash.pidのパスを変更することができます。  
   Systemdサービスを使用しない場合は不要です。  
-<br>
+  <br>
 * <code>WITH_LIBXML2</code>  
   デフォルト値 : 空欄  
   使用例 : <code>-DWITH_LIBXML2=/opt/libxml2/lib64/pkgconfig</code>  
@@ -256,46 +256,46 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   News APIからニュースを取得するかどうかを指定します。  
   無料版のNews APIは、ニュース記事が1日遅れのため、デフォルトは無効です。  
   なお、有料版のNews APIビジネスにおいて、月額$449となっております。  
-<br>
+  <br>
 * api  
   デフォルト値 : 空欄  
   News APIからニュースを取得する場合、APIキーが必要となります。  
   そのAPIキーを指定します。  
-<br>
+  <br>
 * exclude  
   デフォルト値 : <code>["Kbc.co.jp", "Sponichi.co.jp", "Bunshun.jp", "Famitsu.com", "Sma.co.jp",  "Oricon.co.jp", "Jleague.jp", "YouTube"]</code>  
   News APIから取得するニュース記事において、除外するメディアを指定します。  
- <br>
+  <br>
 * jiji  
   デフォルト値 : <code>true</code>  
   時事ドットコムからニュースを取得するかどうかを指定します。  
   デフォルトは有効です。  
- <br>
+  <br>
 * kyodo  
   デフォルト値 : <code>true</code>  
   共同通信からニュースを取得するかどうかを指定します。  
   デフォルトは有効です。  
- <br>
+  <br>
 * asahi  
   デフォルト値 : <code>false</code>  
   朝日デジタルからニュースを取得するかどうかを指定します。  
   デフォルトは無効です。  
- <br>
+  <br>
 * cnet  
   デフォルト値 : <code>true</code>  
   CNET Japanからニュースを取得するかどうかを指定します。  
   デフォルトは有効です。  
-<br>
+  <br>
 * hanj  
   デフォルト値 : <code>false</code>  
   ハンギョレ新聞 ジャパンからニュースを取得するかどうかを指定します。  
   デフォルトは無効です。  
-<br>
+  <br>
 * maxpara  
   デフォルト値 : <code>100</code>  
   各ニュース記事の本文の最大文字数を指定します。  
-  デフォルトは最大100文字です。 
-<br>
+  デフォルトは最大100文字です。  
+  <br>
 * interval  
   デフォルト値 : <code>1800</code>  
   各ニュースサイトからニュース記事を取得する時間間隔 (秒) を指定します。  
@@ -306,65 +306,66 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   <br>
   <u>より多くのニュース記事を読む込む場合、時間が掛かることが予想されます。</u>  
   <u>その場合、大きめの数値を指定したほうがよい可能性があります。</u>  
-<br>
-* writefile <u>**(version 0.1.0以降は無効)**</u>  
+  <br>
+* <del>writefile</del> <u>**(version 0.1.0以降は無効)**</u>  
   デフォルト値 : <code>/tmp/qNewsFlashWrite.json</code>  
   このソフトウェアは、各ニュースサイトからニュース記事群からニュース記事を自動的に1つ選択します。  
   このファイルは、その選択された1つのニュース記事の情報が記載されています。  
   <br>
   このファイルを利用して、ユーザは掲示板等に自動的に書き込むようなスクリプトを作成することができます。  
-<br>
+  <br>
 * logfile  
   デフォルト値 : <code>/var/log/qNewsFlash_log.json</code>  
   上記のニュース記事が自動的に1つ選択された時、選択された各記事のログを保存しています。  
   ただし、当日に選択された記事のみを保存しているため、前日のログは自動的に削除されます。  
   <br>
   前日の記事が削除されるタイミングは、日付が変わった時の最初の更新時です。  
-<br>
+  <br>
 * update  
   デフォルト値 : 空欄  
   ニュース記事を取得した直近の時間です。  
   ニュース記事を取得した時に自動的に更新されます。  
-  ユーザはこの値を書き換えないようにしてください。  
+  ユーザはこの値を書き換えないようにしてください。
+  <br>
 * requesturl  
   デフォルト値 : 空欄  
   ニュース記事を書き込むため、POSTデータを送信するURLを指定します。  
   <br>
   0ch系の場合は、<code>**http(s)://<ドメイン名>/test/bbs.cgi?guid=ON**</code> の場合が多いです。  
   書き込み時に必須です。  
-<br>
+  <br>
 * subject  
   デフォルト値 : 空欄  
   POSTデータとして送信します。  
-<br>
+  <br>
 * from  
   デフォルト値 : 空欄  
   POSTデータとして送信します。  
-<br>
+  <br>
 * mail  
   デフォルト値 : 空欄  
   フォームのメール欄に入力する文字列を指定します。  
   POSTデータとして送信します。  
-<br>
+  <br>
 * bbs  
   デフォルト値 : 空欄  
   掲示板のBBS名を指定します。  
   POSTデータとして送信します。  
   書き込み時に必須です。  
-<br>
+  <br>
 * time  
   デフォルト値 : 空欄  
   書き込む時間を指定します。  
   掲示板によっては、この値は意味をなさない可能性があります。  
   POSTデータとして送信します。  
   書き込み時に必須だと思われます。  
-<br>
+  <br>
 * key  
   デフォルト値 : 空欄  
   ニュース記事を書き込むスレッド番号を指定します。  
   POSTデータとして送信します。  
   書き込み時に必須です。  
-<br>
+  <br>
 * shiftjis  
   デフォルト値 : <code>true</code>  
   POSTデータの文字コードをShift-JISに変換するかどうかを指定します。  
