@@ -20,11 +20,11 @@ int main(int argc, char *argv[])
     Proc.waitForFinished();
 
     // ランナー開始
-    Runner runner(app.arguments(), RunUser);
+    Runner runner(QCoreApplication::arguments(), RunUser);
     QTimer::singleShot(0, &runner, &Runner::run);
-#else
+#elif Q_OS_WIN
     // ランナー開始
-    Runner runner(app.arguments());
+    Runner runner(QCoreApplication::arguments());
     QTimer::singleShot(0, &runner, &Runner::run);
 #endif
 

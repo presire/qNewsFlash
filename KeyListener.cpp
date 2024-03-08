@@ -1,15 +1,12 @@
 #include "KeyListener.h"
 
-KeyListener::KeyListener()
+KeyListener::KeyListener() : m_stopRequested(false)
 {
 
 }
 
 
-KeyListener::~KeyListener()
-{
-
-}
+KeyListener::~KeyListener() = default;
 
 
 void KeyListener::run()
@@ -18,7 +15,13 @@ void KeyListener::run()
 
     do {
         key = std::getchar();
-    } while (key != 'Q' && key != 'q');
+    } while (key != 'Q' && key != 'q' && !m_stopRequested.load());
 
     QCoreApplication::exit();
+}
+
+
+void KeyListener::stop()
+{
+    m_stopRequested.store(true);
 }

@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.15)
-project(qNewsFlash VERSION 0.1.0 LANGUAGES CXX)
+project(qNewsFlash VERSION 0.1.1 LANGUAGES CXX)
+
+
+# Linuxのみビルドを許可
+if(NOT UNIX OR APPLE)
+  message(FATAL_ERROR "${qNewsFlash}は、Linuxのみでビルドできます")
+endif()
+
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -9,15 +16,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
-# Qt 5.15未満は不可
-set(QT_MINIMUM_VERSION 5.15)
-
-
 # ビルドタイプ
-if(CMAKE_BUILD_TYPE STREQUAL "")
-    set(CMAKE_BUILD_TYPE "Release")
-endif()
-
+#if(CMAKE_BUILD_TYPE STREQUAL "")
+#    set(CMAKE_BUILD_TYPE "Release")
+#endif()
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING "")
 
 ## ビルドタイプを表示
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -68,8 +71,8 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Network)
 pkg_check_modules(QT_CORE     Qt${QT_VERSION_MAJOR}Core REQUIRED IMPORTED_TARGET)
 pkg_check_modules(QT_NETWORK  Qt${QT_VERSION_MAJOR}Network REQUIRED IMPORTED_TARGET)
 
-
 ## Qt 5.15未満はビルドエラー
+#set(QT_MINIMUM_VERSION 5.15)
 if(QT_VERSION VERSION_LESS 5.15.0)
     message(FATAL_ERROR "Qt version must be greater than or equal to 5.15.0")
 endif()
@@ -80,8 +83,7 @@ add_executable(qNewsFlash
         Runner.h Runner.cpp
         HtmlFetcher.h HtmlFetcher.cpp
         Article.h Article.cpp
-        Seed.h Seed.cpp
-        KeyListener.h KeyListener.cpp
+        RandomGenerator.h RandomGenerator.cpp
         Poster.h Poster.cpp
 )
 
@@ -206,7 +208,6 @@ install(PROGRAMS
 
 # 同梱しているQt5ライブラリのインストールルール
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Qt/
-        #DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/Qt
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/Qt
         FILES_MATCHING PATTERN "*"
 )
@@ -222,13 +223,3 @@ install(TARGETS qNewsFlash
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(qNewsFlash)
 endif()
-
-
-#[[find_package(Qt5 COMPONENTS
-        Core
-        REQUIRED)
-
-add_executable(qNewsFlash main.cpp)
-target_link_libraries(qNewsFlash
-        Qt5::Core
-)]]

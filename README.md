@@ -5,7 +5,9 @@ URL : https://github.com/presire/qNewsFlash
 <br>
 
 # はじめに  
-qNewsFlashは、News APIや時事ドットコム等のニュース記事を取得して、JSONファイルに出力するソフトウェアです。  
+qNewsFlashは、News APIや時事ドットコム等のニュース記事を取得して、掲示板等に書き込むソフトウェアです。  
+0chの場合、既存のスレッドにのみニュース記事を自動的に書き込むことができます。  
+
 現在対応しているニュースサイトは、以下の通りです。  
 
 * News API (無料版のNews APIはニュース記事が1日遅れのため、デフォルトでは無効)  
@@ -17,17 +19,19 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 
 <br>
 
-**このソフトウェアは、Qt 5.15 および libxml 2.0を使用して開発されているため、動作させるためにはそれらのライブラリが必要となります。**  
+**このソフトウェアを動作させるには、Qt 5.15以降 (Core、Network) および libxml 2.0が必要となります。**  
 <br>
 
-この記事では、Red Hat Enterprise LinuxおよびSUSE Enterprise Linux / openSUSEを前提に記載しております。  
-また、特別な操作無しで、他のLinuxディストリビューションにもインストールして使用できると思います。  
-(例: Debian GNU/Linux, Fedora, Manjaro, ... など)  
+この記事では、Red Hat Enterprise LinuxおよびSUSE Linux Enterprise / openSUSEを前提に記載しております。  
+また、他のLinuxディストリビューションにもインストールして使用できると思います。  
+(例: Debian GNU/Linux, Fedora, Manjaro, ... 等)  
 <br>
 
 **注意：**  
 **version 0.1.0から試験的ですが、掲示板等に書き込めるようになりました。**  
-**また、要望があれば、逐次開発を進めていく予定です。**  
+**ただし、新規スレッドを立てる機能はありませんのでご注意ください。**  
+
+**また、ご要望があれば、逐次開発を進めていく予定です。**  
 <br>
 <br>
 
@@ -37,13 +41,13 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 * Qt5 Core
 * Qt5 Network
   * <https://www.qt.io/>  
-  * qNewsFlashは、Qtを使用しています。
+  * qNewsFlashは、Qtライブラリを使用しています。
   * 上記で使用しているQtライブラリは、LGPL v3オープンソースライセンスの下で利用可能です。  
   * Qtのライセンスファイルは、以下に示すファイルで確認できます。  
     <I>**LibraryLicenses/Qt/LGPL-3.0**</I>  
 <br>
 
-* libxml2.0
+* libxml 2.0
   * <https://gitlab.gnome.org/GNOME/libxml2>  
   * qNewsFlashは、libxml 2.0を使用しています。  
   * libxml 2.0は、MITライセンスの下で利用可能です。  
@@ -54,15 +58,15 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 
 システムをアップデートした後、続いてビルドに必要なライブラリをインストールします。  
 
-    # RedHat Enterprise Linux
+    # Red Hat Enterprise Linux
     sudo dnf update   
     sudo dnf install coreutils coreutils-common make cmake gcc gcc-c++ \  
                      libxml2 libxml2-devel qt5-qtbase-devel  
 
-    # SLE / openSUSE
+    # SUSE Linux Enterprise / openSUSE
     sudo zypper update  
     sudo zypper install coreutils make cmake gcc gcc-c++ libxml2-devel \  
-                        libqt5-qtbase-common-devel libQt5Core-devel \  
+                        libqt5-qtbase-common-devel libQt5Core-devel    \  
                         libQt5Network-devel  
 <br>
 <br>
@@ -79,7 +83,7 @@ GitHubからqNewsFlashのソースコードをダウンロードします。
 <br>
 
 qNewsFlashをソースコードからビルドするには、<code>cmake</code>コマンドを使用します。  
-Ninjaを使用する場合は、<code>cmake</code>コマンドに<code>-G Ninja</code>オプションを付加します。  
+Ninjaビルドを使用する場合は、<code>cmake</code>コマンドに<code>-G Ninja</code>オプションを付加します。  
 <br>
 
 ビルド時に使用できるオプションを以下に示します。  
@@ -124,7 +128,7 @@ Ninjaを使用する場合は、<code>cmake</code>コマンドに<code>-G Ninja<
     cmake -DCMAKE_BUILD_TYPE=Release \  
           -DCMAKE_INSTALL_PREFIX=<"qNewsFlashのインストールディレクトリ"> \  
           -SYSCONF_DIR=<"設定ファイルのインストールディレクトリ">           \  
-          -DSYSTEMD=user  \  # Systemdサービスファイルをインストールする場合  
+          -DSYSTEMD=user  \  # Systemdサービスファイルをユーザディレクトリにインストールする場合  
           -DPID=/tmp      \  # Systemdサービスを使用する場合
           ..  
     
@@ -181,6 +185,27 @@ Systemdサービスを使用せずに、qNewsFlashを実行することもでき
 
 直接実行した場合において、**[q]キー** または **[Q]キー** ==> **[Enter]キー** を押下することにより、qNewsFlashを終了することができます。  
 <br>
+
+## 2.3 設定ファイル qNewsFlash.jsonのautofetchを無効にしている場合
+
+ワンショット機能を有効にしている状態でSystemdサービスから起動する場合は、qnewsflash.serviceファイルの設定を変更する必要があります。  
+qnewsflash.serviceファイルを開いて、<code>[Service]</code>セクションの<code>Type</code>キーの値を、<code>oneshot</code>に変更します。  
+
+併せて、<code>ExecStop</code>キーの行をコメントアウトします。  
+
+以下のSystemdサービスファイルの設定例をご参照ください。  
+<br>
+
+**Systemdサービスの設定例**  
+[Service]  
+Type=oneshot  
+ExecStart=/<qNewsFlashのインストールディレクトリ>/bin/qNewsFlash --sysconf=<qNewsFlash.jsonのパス>  
+ExecReload=/bin/kill -HUP  $MAINPID  
+#ExecStop=/bin/kill   -TERM $MAINPID  
+PIDFile=<qNewsFlash.pidのパス>  
+Restart=no  
+
+<br>
 <br>
 
 
@@ -211,7 +236,7 @@ qNewsFlash.shファイルの内容を以下に示します。
     cd $dirname
 
     # Qt 5ライブラリのパスを環境変数LD_LIBRARY_PATHに追加
-    export LD_LIBRARY_PATH="/<Qt 5のインストールディレクトリ>/lib64/Qt:$LD_LIBRARY_PATH"
+    export LD_LIBRARY_PATH="/<qNewsFlashのインストールディレクトリ>/<lib または lib64>/Qt:$LD_LIBRARY_PATH"
 
     # qNewsFlashの実行
     "$dirname/$appname" "$@" 
@@ -232,9 +257,9 @@ qNewsFlashが正常に実行できるかどうかを確認してください。
 
 Systemdサービスを使用する場合は、<I>**ExecStart**</I> キーの値も変更します。  
 
-<code>
-ExecStart=/<qNewsFlashのインストールディレクトリ>/bin/qNewsFlash.sh --sysconf=<設定ファイル qNewsFlash.jsonのパス>  
-</code>
+
+<code>ExecStart=/< qNewsFlashのインストールディレクトリ >/bin/qNewsFlash.sh --sysconf=<qNewsFlash.jsonのパス></code>
+
 <br>
 <br>
 
@@ -291,9 +316,19 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   ハンギョレ新聞 ジャパンからニュースを取得するかどうかを指定します。  
   デフォルトは無効です。  
   <br>
+* autofetch  
+  デフォルト値 : <code>true</code>  
+  タイマ (<code>interval</code>キーの値を使用) を使用して、ニュース記事を自動取得するかどうかを指定する。  
+  <br>
+  Cronを使用して本ソフトウェアをワンショットで実行する場合は、この値を<code>false</code>に指定します。  
+  したがって、<code>false</code>に指定する場合、本ソフトウェアをワンショットで実行して、ニュース記事を1度だけ自動取得することができます。  
+  例えば、Systemdサービスを使用できない環境等で使用します。  
+  <br>
 * maxpara  
   デフォルト値 : <code>100</code>  
   各ニュース記事の本文の最大文字数を指定します。  
+  <code>0</code>を指定する場合、本文は非表示となります。  
+  <br>
   デフォルトは最大100文字です。  
   <br>
 * interval  
@@ -306,6 +341,13 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   <br>
   <u>より多くのニュース記事を読む込む場合、時間が掛かることが予想されます。</u>  
   <u>その場合、大きめの数値を指定したほうがよい可能性があります。</u>  
+  <br>
+* withinhours  
+  デフォルト値 : <code>0</code> (無効)  
+  <br>
+  例えば、公開日が3時間前以内のニュース記事を取得する場合、設定ファイル qNewsFlash.jsonの<code>withinhours</code>キーの値を<code>"3"</code>に指定します。  
+  なお、<code>withinhours</code>キーに指定できる値は、<code>"0"</code>から<code>"24"</code>までです。  
+  <code>"0"</code>、<code>"25"</code>以上の値、その他の値を指定する場合はこの機能は無効になります。  
   <br>
 * <del>writefile</del> <u>**(version 0.1.0以降は無効)**</u>  
   デフォルト値 : <code>/tmp/qNewsFlashWrite.json</code>  
@@ -325,7 +367,8 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   デフォルト値 : 空欄  
   ニュース記事を取得した直近の時間です。  
   ニュース記事を取得した時に自動的に更新されます。  
-  ユーザはこの値を書き換えないようにしてください。
+  <br>
+  <u>ユーザはこの値を書き換えないようにしてください。</u>  
   <br>
 * requesturl  
   デフォルト値 : 空欄  
@@ -376,6 +419,7 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
     {  
       "api": "",  
       "asahi": false,  
+      "autofetch": true,  
       "cnet": true,  
       "exclude": [  
         "Kbc.co.jp",  
@@ -409,8 +453,9 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
 <br>
 
 
-# 5 <del>書き込み用の記事ファイル - qNewsFlashWrite.jsonファイル</del><br>**この設定ファイルは現在使用されておりません**  
+# 5 <del>書き込み用の記事ファイル - qNewsFlashWrite.jsonファイル</del>  
 
+**この設定ファイルは現在使用されておりません**  
 
 上記のセクションでも記載した通り、  
 このソフトウェアは、各ニュースサイトからニュース記事を複数取得して、その複数のニュース記事から自動的に1つのみを選択します。  

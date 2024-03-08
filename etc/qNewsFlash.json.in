@@ -1,6 +1,8 @@
 {
     "api": "",
     "asahi": false,
+    "autofetch": false,
+    "bbs": "",
     "cnet": true,
     "exclude": [
         "Kbc.co.jp",
@@ -13,20 +15,20 @@
         "YouTube"
     ],
     "hanj": false,
+    "from": "",
     "interval": "1800",
     "jiji": true,
+    "key": "",
     "kyodo": true,
     "logfile": "/var/log/qNewsFlash_log.json",
+    "mail": "",
     "maxpara": "100",
     "newsapi": false,
-    "update": "",
-    "writefile": "/tmp/qNewsFlashWrite.json",
     "requesturl": "",
+    "shiftjis": true,
     "subject": "",
-    "from": "",
-    "mail": "",
-    "bbs": "",
     "time": "",
-    "key": "",
-    "shiftjis": true
+    "update": "",
+    "withinhours": "0",
+    "writefile": ""
 }

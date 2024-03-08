@@ -2,20 +2,17 @@
 #include "HtmlFetcher.h"
 
 
-HtmlFetcher::HtmlFetcher(unsigned long long maxParagraph, QObject *parent) : m_MaxParagraph(maxParagraph),
+HtmlFetcher::HtmlFetcher(long long maxParagraph, QObject *parent) : m_MaxParagraph(maxParagraph),
     m_pManager(std::make_unique<QNetworkAccessManager>(this)) , QObject{parent}
 {
 
 }
 
 
-HtmlFetcher::~HtmlFetcher()
-{
-
-}
+HtmlFetcher::~HtmlFetcher() = default;
 
 
-int HtmlFetcher::fetch(const QUrl &url, bool redirect, QString _xpath)
+int HtmlFetcher::fetch(const QUrl &url, bool redirect, const QString& _xpath)
 {
     // リダイレクトを自動的にフォロー
     QNetworkRequest request(url);
@@ -36,7 +33,7 @@ int HtmlFetcher::fetch(const QUrl &url, bool redirect, QString _xpath)
 }
 
 
-int HtmlFetcher::fetchParagraph(QNetworkReply *reply, QString _xpath)
+int HtmlFetcher::fetchParagraph(QNetworkReply *reply, const QString& _xpath)
 {
     if (reply->error() != QNetworkReply::NoError) {
         std::cerr << "エラー : " << reply->errorString().toStdString();
@@ -52,20 +49,23 @@ int HtmlFetcher::fetchParagraph(QNetworkReply *reply, QString _xpath)
     LIBXML_TEST_VERSION
 
     // 文字列からHTMLドキュメントをパース
-    xmlDocPtr doc = htmlReadDoc((const xmlChar*)htmlContent.toStdString().c_str(), NULL, NULL, HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+    xmlDocPtr doc = htmlReadDoc((const xmlChar*)htmlContent.toStdString().c_str(), nullptr, nullptr, HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
     if (doc == nullptr) {
         std::cerr << "Document not parsed successfully" << std::endl;
+        reply->deleteLater();
+
         return -1;
     }
 
     // XPathで特定の要素を検索
     //xmlChar *xpath = (xmlChar*) "//head/meta[@name='description']/@content";
-    auto pXPath = _xpath.toLocal8Bit().data();
-    xmlChar *xpath = reinterpret_cast<xmlChar*>(pXPath);
+    //auto pXPath = _xpath.toLocal8Bit().data();
+    auto *xpath = xmlStrdup((const xmlChar*)_xpath.toUtf8().constData());
     xmlXPathObjectPtr result = getNodeset(doc, xpath);
     if (result == nullptr) {
         std::cerr << "Error in getNodeset" << std::endl;
         xmlFreeDoc(doc);
+        reply->deleteLater();
 
         return -1;
     }
@@ -92,7 +92,7 @@ int HtmlFetcher::fetchParagraph(QNetworkReply *reply, QString _xpath)
     }
 
     // 本文が指定文字数以上の場合、指定文字数分のみを抽出
-    m_Paragraph = content.size() > m_MaxParagraph ? m_Paragraph = content.mid(0, m_MaxParagraph - 1) : content;
+    m_Paragraph = content.size() > m_MaxParagraph ? m_Paragraph = content.mid(0, static_cast<int>(m_MaxParagraph)) : content;
 
     xmlXPathFreeObject(result);
     xmlFreeDoc(doc);

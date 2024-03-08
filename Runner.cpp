@@ -15,27 +15,30 @@
 #include <utility>
 #include "Runner.h"
 #include "HtmlFetcher.h"
-#include "Seed.h"
+#include "RandomGenerator.h"
 
 
-Runner::Runner(QStringList _args, QObject *parent) : m_args(std::move(_args)), m_SysConfFile(""), m_interval(30 * 60 * 1000),
-    m_bNewsAPI(false), m_bJiJi(true),
-    m_pListener(std::make_unique<KeyListener>()),
-    manager(std::make_unique<QNetworkAccessManager>(this)),
-    QObject{parent}
-{
-    connect(&m_timer, &QTimer::timeout, this, &Runner::fetch);
-}
-
-
+#ifdef Q_OS_LINUX
 Runner::Runner(QStringList _args, QString user, QObject *parent) : m_args(std::move(_args)), m_User(std::move(user)), m_SysConfFile(""), m_interval(30 * 60 * 1000),
-    m_bNewsAPI(false), m_bJiJi(true), m_bKyodo(true), m_bHanJ(false),
-    m_pListener(std::make_unique<KeyListener>()),
+    m_pNotifier(std::make_unique<QSocketNotifier>(fileno(stdin), QSocketNotifier::Read, this)), m_stopRequested(false),
     manager(std::make_unique<QNetworkAccessManager>(this)),
     QObject{parent}
 {
     connect(&m_timer, &QTimer::timeout, this, &Runner::fetch);
+    connect(m_pNotifier.get(), &QSocketNotifier::activated, this, &Runner::onReadyRead);  // キーボードシーケンスの有効化
 }
+#elif Q_OS_WIN
+Runner::Runner(QStringList _args, QObject *parent) : m_args(std::move(_args)), m_SysConfFile(""), m_interval(30 * 60 * 1000),
+    m_pNotifier(std::make_unique<QWinEventNotifier>(fileno(stdin), QWinEventNotifier::Read, this)), m_stopRequested(false),
+    manager(std::make_unique<QNetworkAccessManager>(this)),
+    QObject{parent}
+{
+    connect(&m_timer, &QTimer::timeout, this, &Runner::fetch);
+    connect(m_pNotifier.get(), &QWinEventNotifier::activated, this, &Runner::onReadyRead);  // キーボードシーケンスの有効化
+}
+
+#endif
+
 
 
 void Runner::run()
@@ -44,32 +47,51 @@ void Runner::run()
 
     // コマンドラインオプションの確認
     // 設定ファイルおよびバージョン情報
+    m_args.removeFirst();   // プログラムのパスを削除
     for (auto &arg : m_args) {
         if(arg.mid(0, 10) == "--sysconf=") {
             // 設定ファイルのパス
-            arg = arg.replace("--sysconf=", "", Qt::CaseSensitive);
+            auto option = arg;
+            option.replace("--sysconf=", "", Qt::CaseSensitive);
 
             // 先頭と末尾にクォーテーションが存在する場合は取り除く
-            if ((arg.startsWith('\"') && arg.endsWith('\"')) || (arg.startsWith('\'') && arg.endsWith('\''))) {
-                arg = arg.mid(1, arg.length() - 2);
+            if ((option.startsWith('\"') && option.endsWith('\"')) || (option.startsWith('\'') && option.endsWith('\''))) {
+                option = option.mid(1, option.length() - 2);
             }
 
-            if (getConfiguration(arg)) {
+            if (getConfiguration(option)) {
                 QCoreApplication::exit();
                 return;
             }
             else {
-                m_SysConfFile = arg;
+                m_SysConfFile = option;
             }
 
             break;
         }
-        else if (m_args.length() == 2 && arg.compare("--version", Qt::CaseSensitive) == 0) {
+        else if (m_args.length() == 1 && (arg.compare("--version", Qt::CaseInsensitive) == 0 || arg.compare("-v", Qt::CaseSensitive) == 0) ) {
             // バージョン情報
             auto version = QString("qNewsFlash %1.%2.%3\n").arg(PROJECT_VERSION_MAJOR).arg(PROJECT_VERSION_MINOR).arg(PROJECT_VERSION_PATCH)
-                           + QString("LICENSE : UNLICENSE - For more information, please refer to <http://unlicense.org/>.\n")
-                           + QString("Developer : presire\n");
-            std::cerr << version.toStdString() << std::endl;
+                           + QString("ライセンス : UNLICENSE\n")
+                           + QString("ライセンスの詳細な情報は、<http://unlicense.org/> を参照してください\n\n")
+                           + QString("開発者 : presire with ﾘ* ﾞㇷﾞ)ﾚ の みんな\n\n");
+            std::cout << version.toStdString() << std::endl;
+
+            QCoreApplication::exit();
+            return;
+        }
+        else if (m_args.length() == 1 && (arg.compare("--help", Qt::CaseInsensitive) == 0 || arg.compare("-h", Qt::CaseInsensitive) == 0) ) {
+            // ヘルプ
+            auto help = QString("使用法 : qNewsFlash [オプション]\n\n")
+                           + QString("  --sysconf=<qNewsFlash.jsonファイルのパス>\t\t設定ファイルのパスを指定する\n")
+                           + QString("  -v, -V, --version                      \t\tバージョン情報を表示する\n\n");
+            std::cout << help.toStdString() << std::endl;
+
+            QCoreApplication::exit();
+            return;
+        }
+        else {
+            std::cerr << QString("エラー : 不明なオプションです - %1").arg(arg).toStdString() << std::endl;
 
             QCoreApplication::exit();
             return;
@@ -117,32 +139,43 @@ void Runner::run()
     }
 #endif
 
-    // ニュース記事を取得する間隔 (未指定の場合、インターバルは30[分])
-    // ただし、3分未満には設定できない (3分未満に設定した場合は、3分に設定する)
-    if (m_interval == 0) {
-        std::cerr << "インターバルの値が未指定もしくは0のため、30[分]に設定されます" << std::endl;
-        m_interval = 60 * 1000 * 30;
+    if (!m_AutoFetch) {
+        // 自動的にニュース記事を取得しない場合、タイマのシグナル / スロットを無効にする
+        disconnect(&m_timer, &QTimer::timeout, this, &Runner::fetch);
     }
-    else if (m_interval < (60 * 1000 * 3)) {
-        std::cerr << "インターバルの値が3[分]未満のため、3[分]に設定されます" << std::endl;
-        m_interval = 60 * 1000 * 3;
+    else {
+        // ニュース記事を取得する間隔 (未指定の場合、インターバルは30[分])
+        // ただし、3分未満には設定できない (3分未満に設定した場合は、3分に設定する)
+        if (m_interval == 0) {
+            std::cerr << "インターバルの値が未指定もしくは0のため、30[分]に設定されます" << std::endl;
+            m_interval = 60 * 1000 * 30;
+        } else if (m_interval < (60 * 1000 * 3)) {
+            std::cerr << "インターバルの値が3[分]未満のため、3[分]に設定されます" << std::endl;
+            m_interval = 60 * 1000 * 3;
+        } else if (m_interval < 0) {
+            std::cerr << "インターバルの値が不正です" << std::endl;
+
+            QCoreApplication::exit();
+            return;
+        }
+
+        m_timer.start(static_cast<int>(m_interval));
     }
-    else if (m_interval < 0) {
-        std::cerr << "インターバルの値が不正です" << std::endl;
-
-        QCoreApplication::exit();
-        return;
-    }
-
-    // キーボードシーケンスの有効化
-    // [q]キーまたは[Q]キーを押下した場合、メインループを抜けてアプリケーションを終了する
-    m_pListener->start();
-
-    m_timer.start(static_cast<int>(m_interval));
 
     // アプリケーション開始直後にRSSを読み込む場合は、コメントを解除して、fetchRssFeed()メソッドを実行する
     // コメントアウトしている場合、最初にRSSを読み込むタイミングは、タイマの指定時間後となる
     fetch();
+
+    // ソフトウェアの自動起動が無効の場合
+    // Cronを使用する場合、または、ワンショットで動作させる場合に使用
+    if (!m_AutoFetch) {
+        // 既に[q]キーまたは[Q]キーが押下されている場合は再度終了処理を行わない
+        if (!m_stopRequested.load()) {
+            // ソフトウェアを終了する
+            QCoreApplication::exit();
+            return;
+        }
+    }
 }
 
 
@@ -180,6 +213,8 @@ void Runner::fetch()
     // 前回取得した書き込み前の記事群(選定前)を初期化
     m_BeforeWritingArticles.clear();
 
+    if (m_stopRequested.load()) return;
+
     // News APIの日本国内の記事を取得
     // ただし、無料版のNews APIの記事は24時間遅れであるため、News APIを使用する場合は有料版を推奨する
     if (m_bNewsAPI) {
@@ -201,6 +236,9 @@ void Runner::fetch()
         loop.exec();
     }
 
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されているかどうかを確認
+    if (m_stopRequested.load()) return;
+
     // 時事ドットコムの記事を取得
     if (m_bJiJi) {
         // 時事ドットコムのRSSフィードのURLを指定
@@ -220,6 +258,9 @@ void Runner::fetch()
         QObject::connect(this, &Runner::JiJifinished, &loop, &QEventLoop::quit);
         loop.exec();
     }
+
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されているかどうかを確認
+    if (m_stopRequested.load()) return;
 
     // 共同通信の記事を取得
     if (m_bKyodo) {
@@ -241,6 +282,9 @@ void Runner::fetch()
         loop.exec();
     }
 
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
+    if (m_stopRequested.load()) return;
+
     // 朝日デジタルの記事を取得
     if (m_bAsahi) {
         // 朝日デジタルのRSSフィードのURLを指定
@@ -260,6 +304,9 @@ void Runner::fetch()
         QObject::connect(this, &Runner::Asahifinished, &loop, &QEventLoop::quit);
         loop.exec();
     }
+
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
+    if (m_stopRequested.load()) return;
 
     // CNET Japanの記事を取得
     if (m_bCNet) {
@@ -281,9 +328,12 @@ void Runner::fetch()
         loop.exec();
     }
 
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
+    if (m_stopRequested.load()) return;
+
     // ハンギョレジャパンの記事を取得
     if (m_bHanJ) {
-        // ンギョレジャパンのRSSフィードのURLを指定
+        // ハンギョレジャパンのRSSフィードのURLを指定
         QUrl urlHanJ("https://japan.hani.co.kr/rss/");
 
         /// HTTPリクエストを作成して、ヘッダを設定
@@ -301,21 +351,28 @@ void Runner::fetch()
         loop.exec();
     }
 
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
+    if (m_stopRequested.load()) return;
+
     // 取得したニュース記事群を操作
-    if (m_BeforeWritingArticles.length() > 0) {
+    if (!m_BeforeWritingArticles.empty()) {
         // 取得したニュース記事群が存在する場合
 
         // ニュース記事が複数存在する場合、ランダムで決定する
         auto article = selectArticle();
 
 #ifndef _BELOW_0_1_0
-        // スレッド情報の設定
-        auto [title, paragraph, link, date] = article.getArticleData();
-        m_ThreadInfo.message = QString("%1\n%2\n%3\n%4").arg(title, date, paragraph, link);
+        // ニュース記事のタイトル --> 公開日 --> 本文の一部 --> URL の順に並べて書き込む
+        // ただし、ニュース記事の本文を取得しない場合は、ニュース記事のタイトル --> 公開日 --> URL の順とする
+        auto [title, paragraph, link, pubDate] = article.getArticleData();
+        m_ThreadInfo.message = QString("%1%2%3%4").arg(QString(title + "\n"),
+                                                       QString(pubDate + "\n"),
+                                                       QString(paragraph.length() == 0 ? "" : QString(paragraph + "\n")),
+                                                       QString(link + "\n"));
 
         Poster poster(this);
 
-        // クッキーの取得
+        // 掲示板のクッキーを取得
         if (poster.fetchCookies(QUrl(m_RequestURL))) {
             // クッキーの取得に失敗した場合
             return;
@@ -323,7 +380,7 @@ void Runner::fetch()
 
         // POSTデータの送信
         if (poster.Post(QUrl(m_RequestURL), m_ThreadInfo)) {
-            // 記事の書き込みに失敗した場合
+            // スレッドへの書き込みに失敗した場合
             return;
         }
 
@@ -347,15 +404,20 @@ void Runner::fetch()
         // ただし、1日過ぎた場合は書き込み済み記事の履歴を削除する
         m_WrittenArticles.append(article);
     }
-    else {
 #ifdef _BELOW_0_1_0
+    // qNewsFlash 0.1.0未満の機能
+    else {
+
         // スレッド書き込み用のJSONファイルの内容を空にする
         if (truncateJSON()) {
             QCoreApplication::exit();
             return;
         }
-#endif
     }
+#endif
+
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
+    if (m_stopRequested.load()) return;
 }
 
 
@@ -382,10 +444,13 @@ void Runner::fetchNewsAPI()
 
             // UTC時刻から日本時間へ変換
             auto utcDate = article["publishedAt"].toString();
-            auto convDate = convertJPDate(utcDate);
+            auto convDate = Runner::convertJPDate(utcDate);
 
-            // 今日のニュースかどうかを確認
-            if (!isToday(convDate)) continue;
+            // ニュースの公開日を確認
+            auto isCheckDate = m_WithinHours == 0 ? isToday(convDate) : isHoursAgo(convDate);
+            if (!isCheckDate) {
+                continue;
+            }
 
             // 書き込み済みの記事が存在する場合は無視
             // 書き込み済みの記事かどうかを判断する方法として、同一のURLかどうかを確認している
@@ -403,7 +468,7 @@ void Runner::fetchNewsAPI()
 
             // 本文が100文字以上の場合、先頭100文字のみを抽出
             auto paragraph = article["description"].toString();
-            paragraph = paragraph.length() > m_MaxParagraph ? paragraph.mid(0, m_MaxParagraph - 1) : paragraph;
+            paragraph = paragraph.length() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) : paragraph;
 
             // 書き込む前の記事群
             Article articleObj(article["title"].toString(), paragraph, article["url"].toString(), convDate);
@@ -508,8 +573,9 @@ void Runner::itemTagsforJiJi(xmlNode *a_node)
                         // 日付のフォーマットをISO 8601形式("yyyy-MM-ddThh:mm:ssZ")から"yyyy年M月d日 h時m分"へ変更
                         date = convertDate(date);
 
-                        // 今日のニュースかどうかを確認
-                        if (!isToday(date)) {
+                        // ニュースの公開日を確認
+                        auto isCheckDate = m_WithinHours == 0 ? isToday(date) : isHoursAgo(date);
+                        if (!isCheckDate) {
                             bSkipNews = true;
                             break;
                         }
@@ -623,7 +689,7 @@ void Runner::itemTagsforKyodo(xmlNode *a_node)
                         paragraph.replace("&#8230;", "");
 
                         // 本文が指定文字数以上の場合、指定文字数分のみを抽出
-                        paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, m_MaxParagraph - 1) : paragraph;
+                        paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) : paragraph;
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
                         link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
@@ -640,8 +706,9 @@ void Runner::itemTagsforKyodo(xmlNode *a_node)
                         // 日付のフォーマットをUTCから日本時間の"yyyy年M月d日 h時m分"形式へ変更
                         date = convertJPDateforKyodo(date);
 
-                        // 今日のニュースかどうかを確認
-                        if (!isToday(date)) {
+                        // ニュースの公開日を確認
+                        auto isCheckDate = m_WithinHours == 0 ? isToday(date) : isHoursAgo(date);
+                        if (!isCheckDate) {
                             bSkipNews = true;
                             break;
                         }
@@ -764,8 +831,9 @@ void Runner::itemTagsforAsahi(xmlNode *a_node)
                         // 日付のフォーマットを"yyyy-MM-ddThh:mm+09:00"から"yyyy年M月d日 h時m分"へ変更
                         date = convertDate(date);
 
-                        // 今日のニュースかどうかを確認
-                        if (!isToday(date)) {
+                        // ニュースの公開日を確認
+                        auto isCheckDate = m_WithinHours == 0 ? isToday(date) : isHoursAgo(date);
+                        if (!isCheckDate) {
                             bSkipNews = true;
                             break;
                         }
@@ -845,9 +913,7 @@ void Runner::fetchCNetRSS()
 
 void Runner::itemTagsforCNet(xmlNode *a_node)
 {
-    xmlNode *cur_node = nullptr;
-
-    for (cur_node = a_node; cur_node; cur_node = cur_node->next) {
+    for (auto cur_node = a_node; cur_node; cur_node = cur_node->next) {
         if (cur_node->type == XML_ELEMENT_NODE && xmlStrcmp(cur_node->name, BAD_CAST "item") == 0) {
             xmlNode *itemChild = cur_node->children;
             QString title       = "",
@@ -877,7 +943,7 @@ void Runner::itemTagsforCNet(xmlNode *a_node)
                         paragraph = paragraph.replace(re3, "").replace(" ", "").replace("\u3000", "");
 
                         // 本文が指定文字数以上の場合、指定文字数分のみを抽出
-                        paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, m_MaxParagraph - 1) : paragraph;
+                        paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) : paragraph;
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
                         link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
@@ -888,8 +954,9 @@ void Runner::itemTagsforCNet(xmlNode *a_node)
                         // 日付のフォーマットを"yyyy-MM-ddThh:mm+09:00"から"yyyy年M月d日 h時m分"へ変更
                         date = convertDate(date);
 
-                        // 今日のニュースかどうかを確認
-                        if (!isToday(date)) {
+                        // ニュースの公開日を確認
+                        auto isCheckDate = m_WithinHours == 0 ? isToday(date) : isHoursAgo(date);
+                        if (!isCheckDate) {
                             bSkipNews = true;
                             break;
                         }
@@ -969,9 +1036,7 @@ void Runner::fetchHanJRSS()
 
 void Runner::itemTagsforHanJ(xmlNode *a_node)
 {
-    xmlNode *cur_node = nullptr;
-
-    for (cur_node = a_node; cur_node; cur_node = cur_node->next) {
+    for (auto cur_node = a_node; cur_node; cur_node = cur_node->next) {
         if (cur_node->type == XML_ELEMENT_NODE && xmlStrcmp(cur_node->name, BAD_CAST "item") == 0) {
             xmlNode *itemChild = cur_node->children;
             QString title       = "",
@@ -988,15 +1053,15 @@ void Runner::itemTagsforHanJ(xmlNode *a_node)
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "description") == 0) {
                         paragraph = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
 
-                        // 不要な文字を削除 (\n, \t)
+                        // 不要な文字を削除 (\n, \t) (ハンギョレジャパンのRSSの"description"には、不要な文字が含まれているため)
                         static QRegularExpression re1("[\t\n]", QRegularExpression::CaseInsensitiveOption);
                         paragraph = paragraph.replace(re1, "");
 
-                        // tableタグを除去
+                        // tableタグを除去 (ハンギョレジャパンのRSSの"description"には、不要なHTMLタグが含まれているため)
                         static QRegularExpression re2("<table.*>.*</table>", QRegularExpression::DotMatchesEverythingOption);
                         paragraph.remove(re2);
 
-                        // 不要な文字を削除 (スペース等)
+                        // 不要な文字を削除 (半角 / 全角スペース等)
                         static QRegularExpression re3("[\\s]", QRegularExpression::CaseInsensitiveOption);
                         paragraph = paragraph.replace(re3, "").replace(" ", "").replace("\u3000", "");
                     }
@@ -1004,7 +1069,7 @@ void Runner::itemTagsforHanJ(xmlNode *a_node)
                         link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
                         link = QString("https://japan.hani.co.kr") + link;
 
-                        // ニュース記事のURLの内容から本文を取得して指定文字数分のみ取得 (現在は使用しない)
+                        // ニュース記事のURLからHTMLタグを解析した後、本文を取得して指定文字数分のみ取得 (現在は使用しない)
 //                        QUrl url(link);
 //                        HtmlFetcher fetcher(m_MaxParagraph, this);
 
@@ -1022,8 +1087,9 @@ void Runner::itemTagsforHanJ(xmlNode *a_node)
                         // 日付のフォーマットをRFC 2822形式から"yyyy年M月d日 h時m分"へ変更
                         date = convertDateHanJ(date);
 
-                        // 今日のニュースかどうかを確認
-                        if (!isToday(date)) {
+                        // ニュースの公開日を確認
+                        auto isCheckDate = m_WithinHours == 0 ? isToday(date) : isHoursAgo(date);
+                        if (!isCheckDate) {
                             bSkipNews = true;
                             break;
                         }
@@ -1175,7 +1241,6 @@ bool Runner::isToday(const QString &dateString)
     }
 
     // 現在の日時を取得 -> タイムゾーンを日本時間に設定 -> 日付のみを抽出
-    //auto today = QDate::currentDate();
     QDateTime todayTime = QDateTime::currentDateTime();
     todayTime.setTimeZone(QTimeZone("Asia/Tokyo"));
     auto today = todayTime.date();
@@ -1185,17 +1250,48 @@ bool Runner::isToday(const QString &dateString)
 }
 
 
+bool Runner::isHoursAgo(const QString &pubDate)
+{
+    // 日付フォーマットを指定
+    QString format = "yyyy年M月d日 H時m分";
+
+    // 文字列からQDateTimeオブジェクトを生成
+    auto convertPubDate = QDateTime::fromString(pubDate, format);
+
+    // 入力日付の変換が成功したかどうかを確認
+    if (!convertPubDate.isValid()) {
+        std::cerr << "入力された日付が無効です" << std::endl;
+
+        return false;
+    }
+
+    // 現在の日時を取得 -> タイムゾーンを日本時間に設定 -> 日付のみを抽出
+    QDateTime todayTime = QDateTime::currentDateTime();
+    todayTime.setTimeZone(QTimeZone("Asia/Tokyo"));
+
+    // 3時間前の日時を計算
+    QDateTime hoursAgo = todayTime.addSecs(- m_WithinHours * 60 * 60);
+
+    // ニュース記事の公開日時が現在日時の3時間前以内にあるかどうかを確認
+    bool isInTargetDateTime = (convertPubDate >= hoursAgo && convertPubDate <= todayTime);
+
+    // ニュース記事の公開日時が3時間前以内の記事かどうかを判断
+    return isInTargetDateTime;
+}
+
+
 int Runner::getConfiguration(QString &filepath)
 {
     // 設定ファイルのパスが空の場合
     if(filepath.isEmpty()) {
-        std::cerr << QString("オプションが不明です - 使用可能なオプションは次の通りです : \"--sysconf=<path to qNewsFlash.json>\"").toStdString() << std::endl;
+        std::cerr << QString("エラー : オプションが不明です").toStdString() + QString("\n").toStdString() +
+                     QString("使用可能なオプションは次の通りです : --sysconf=<qNewsFlash.jsonのパス>").toStdString() << std::endl;
         return -1;
     }
 
     // 指定された設定ファイルが存在しない場合
     if(!QFile::exists(filepath)) {
-        std::cerr << QString("エラー : ファイルが存在しません : %1").arg(filepath).toStdString() << std::endl;
+        std::cerr << QString("エラー : 設定ファイルが存在しません : %1").arg(filepath).toStdString() << std::endl;
         return -1;
     }
 
@@ -1212,6 +1308,9 @@ int Runner::getConfiguration(QString &filepath)
         // qNewsFlash.jsonファイルの設定を取得
         auto JsonDocument = QJsonDocument::fromJson(byaryJson);
         auto JsonObject   = JsonDocument.object();
+
+        // メンバ変数m_intervalの値を使用して自動的にニュース記事を取得するかどうか
+        m_AutoFetch         = JsonObject["autofetch"].toBool(true);
 
         // News APIの有効/無効
         m_bNewsAPI          = JsonObject["newsapi"].toBool(false);
@@ -1235,11 +1334,11 @@ int Runner::getConfiguration(QString &filepath)
         m_API           = JsonObject["api"].toString("");
 
         // ニュース記事を取得する間隔
-        QString interval    = JsonObject["interval"].toString("60 * 1000 * 30");
+        auto interval    = JsonObject["interval"].toString("60 * 1000 * 30");
         bool ok;
         m_interval = interval.toULongLong(&ok);
         if (!ok) {
-            std::cerr << QString("エラー : 設定ファイルのintervalキーの値が不正です").toStdString() << std::endl;
+            std::cerr << QString("警告 : 設定ファイルのintervalキーの値が不正です").toStdString() << std::endl;
             std::cerr << QString("更新時間の間隔は、自動的に30分に設定されます").toStdString() << std::endl;
 
             m_interval = 60 * 1000 * 30;
@@ -1255,16 +1354,11 @@ int Runner::getConfiguration(QString &filepath)
             m_ExcludeMedia.append(exclude.toString());
         }
 
-        // デフォルト : KBC, スポニチ, 文春, ファミ通, ソニーミュージック, オリコン, Jリーグ, YouTubeの記事を排除
-        if (m_ExcludeMedia.empty()) {
-            m_ExcludeMedia = QStringList{"Kbc.co.jp", "Sponichi.co.jp", "Bunshun.jp", "Famitsu.com", "Sma.co.jp", "Oricon.co.jp", "Jleague.jp", "YouTube"};
-        }
-
         // 本文の一部を抜粋する場合の最大文字数
         auto maxParagraph  = JsonObject["maxpara"].toString("100");
-        m_MaxParagraph = maxParagraph.toULongLong(&ok);
+        m_MaxParagraph = maxParagraph.toLongLong(&ok);
         if (!ok) {
-            std::cerr << QString("エラー : 設定ファイルのmaxparaキーの値が不正です").toStdString() << std::endl;
+            std::cerr << QString("警告 : 設定ファイルのmaxparaキーの値が不正です").toStdString() << std::endl;
             std::cerr << QString("本文の一部を抜粋する場合の最大文字数は、自動的に100文字に設定されます").toStdString() << std::endl;
 
             m_MaxParagraph = 100;
@@ -1283,6 +1377,7 @@ int Runner::getConfiguration(QString &filepath)
         m_ThreadInfo.key        = JsonObject["key"].toString("");       // スレッド番号
         m_ThreadInfo.shiftjis   = JsonObject["shiftjis"].toBool(true);  // Shift-JISの有効 / 無効
 #elif   _BELOW_0_1_0
+        // qNewsFlash 0.1.0未満の機能
         // スレッド書き込み用のJSONファイルのパス
         auto writeFile = JsonObject["writefile"].toString("/tmp/qNewsFlashWrite.json");
 
@@ -1302,12 +1397,26 @@ int Runner::getConfiguration(QString &filepath)
         m_WriteFile = writeFile;
 #endif
 
+        // 公開日がn時間前以内のニュース記事を取得する設定
+        // 0 : 無効
+        // 1 - 24 : 公開日がn時間以内のニュース記事を取得
+        // それ以外 : 無効
+        auto withinhours = JsonObject["withinhours"].toString("0");
+        m_WithinHours = withinhours.toInt(&ok);
+        if (!ok || m_WithinHours < 0 || m_WithinHours > 24) {
+            std::cerr << QString("警告 : 設定ファイルのwithinhoursキーの値が不正です").toStdString() << std::endl;
+            std::cerr << QString("公開日が本日付けのみのニュース記事を取得します").toStdString() << std::endl;
+
+            m_WithinHours = 0;
+        }
+
         // スレッド書き込み済み(ログ用)のJSONファイルのパス
         auto logFile = JsonObject["logfile"].toString("/var/log/qNewsFlash_log.json");
         m_LogFile    = logFile;
 
         // 最後にニュース記事群を取得した日付
         auto update     = JsonObject["update"].toString("");
+
         /// 日付の文字列を解析
         /// 第2引数には、解析したい日付のフォーマットを指定
         /// 生成したQDateオブジェクトが正しい日付を表しているかどうかを確認
@@ -1333,6 +1442,7 @@ int Runner::getConfiguration(QString &filepath)
 }
 
 
+// 現在、"--sysconf"オプションおよび"--version"オプション以外のオプションは無効
 [[maybe_unused]] void Runner::GetOption()
 {
     // コマンドラインのオプションを確認
@@ -1342,13 +1452,13 @@ int Runner::getConfiguration(QString &filepath)
             // News APIの有効/無効を確認
             arg = arg.replace("--newsapi=", "", Qt::CaseSensitive);
             static QRegularExpression regex("['\"]", QRegularExpression::CaseInsensitiveOption);
-            m_bNewsAPI = arg.replace(regex, "").toLower() == "true" ? true : false;
+            m_bNewsAPI = arg.replace(regex, "").toLower() == "true";
         }
         else if (arg.mid(0, 7) == "--jiji=") {
             // 時事ドットコムの有効/無効を確認
             arg = arg.replace("--jiji=", "", Qt::CaseSensitive);
             static QRegularExpression regex("['\"]", QRegularExpression::CaseInsensitiveOption);
-            m_bJiJi = arg.replace(regex, "").toLower() == "true" ? true : false;
+            m_bJiJi = arg.replace(regex, "").toLower() == "true";
         }
         else if (arg.mid(0, 6) == "--api=") {
             // News APIのAPIキーを取得
@@ -1378,6 +1488,7 @@ int Runner::getConfiguration(QString &filepath)
             m_interval *= 1000;
         }
 #ifdef _BELOW_0_1_0
+        // qNewsFlash 0.1.0未満の機能
         else if (arg.mid(0, 8) == "--write=") {
             // News APIのAPIキーを取得
             arg = arg.replace("--write=", "", Qt::CaseSensitive);
@@ -1411,7 +1522,7 @@ int Runner::updateDateJson(const QString &currentDate)
 
     QJsonDocument doc;
     try {
-        /// 設定ファイルの内容を読み込む
+        // 設定ファイルの内容を読み込む
         doc = QJsonDocument::fromJson(File.readAll());
     }
     catch(QException &ex) {
@@ -1461,22 +1572,15 @@ int Runner::updateDateJson(const QString &currentDate)
 
 Article Runner::selectArticle()
 {
-    // CPUのタイムスタンプカウンタ(TSC)をハッシュ化した数値を使用してXorshiftを行い、その値でシード値を生成
-    Seed seedObj;
-    uint64_t seed = seedObj.next();
-
-    // シード値を使用してメルセンヌツイスターを初期化
-    std::mt19937 mt(seed);
-
-    // 0から取得した記事群の数までの一様分布
-    std::uniform_int_distribution<int> dist(0, m_BeforeWritingArticles.size() - 1);
-
-    // 乱数を生成
-    int randomValue = dist(mt);
+    // CPUのタイムスタンプカウンタ(TSC)をハッシュ化した数値をXorshiftしてシード値を生成
+    // 生成したシード値を使用して乱数を生成 (一様分布)
+    // 乱数は、0〜(取得した記事の数 -1)までの値をとる
+    RandomGenerator randomObj;
+    int randomValue = randomObj.Generate(m_BeforeWritingArticles.size());
 
 #ifdef _DEBUG
     // 生成された乱数を出力
-    qDebug() << QString("Generated random number: %1").arg(randomValue);
+    qDebug() << QString("生成された乱数 : この値を取得したニュース記事群の配列の要素数とする : %1").arg(randomValue);
     qDebug() << "";
 #endif
 
@@ -1485,6 +1589,7 @@ Article Runner::selectArticle()
 
 
 #ifdef _BELOW_0_1_0
+// qNewsFlash 0.1.0未満の機能
 int Runner::writeJSON(Article &article)
 {
     auto [title, paragraph, url, date] = article.getArticleData();
@@ -1548,13 +1653,14 @@ int Runner::truncateJSON()
 }
 #endif
 
+
 int Runner::writeLog(Article &article)
 {
     // ログファイルを開く (読み込み用)
     QFile File(m_LogFile);
     QByteArray jsonData = {};
     if (!File.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qWarning("Could not open json file.");
+        std::cerr << QString("エラー : ログファイルのオープンに失敗 %1").arg(File.errorString()).toStdString() << std::endl;
         return -1;
     }
     else {
@@ -1563,7 +1669,7 @@ int Runner::writeLog(Article &article)
             jsonData = File.readAll();
         }
         catch (QException &ex) {
-            std::cerr << QString("エラー : ファイルの読み込みに失敗").toStdString() << std::endl;
+            std::cerr << QString("エラー : ファイルの読み込みに失敗 %1").arg(File.errorString()).toStdString() << std::endl;
             return -1;
         }
 
@@ -1613,10 +1719,49 @@ int Runner::writeLog(Article &article)
 }
 
 
-[[maybe_unused]] int Runner::setLogFile()
+int Runner::setLogFile(QString &filepath)
 {
-    [[maybe_unused]] QString logDir  = "";
-    [[maybe_unused]] QString logFile = "";
+    // 書き込み済み(ログ用)のJSONファイルの情報を取得
+    QFileInfo fileInfo(filepath);
+
+    // 書き込み済み(ログ用)のJSONファイルを保存するディレクトリのパスを取得
+    auto dirPath = fileInfo.absolutePath();
+
+    // 書き込み済み(ログ用)のJSONファイルを保存するディレクトリを確認
+    QDir logDir(dirPath);
+    if (!logDir.exists()) {
+        // ディレクトリが存在しない場合は作成
+        std::cout << QString("ログディレクトリが存在しないため作成します %1").arg(logDir.absolutePath()).toStdString() << std::endl;
+
+        if (!logDir.mkpath(".")) {
+            std::cerr << QString("エラー : ログディレクトリの作成に失敗 %1").arg(logDir.absolutePath()).toStdString() << std::endl;
+            return -1;
+        }
+    }
+
+    // 書き込み済み(ログ用)のJSONファイルが存在しない場合は空のログファイルを作成
+    QFile File(filepath);
+    if (!File.exists()) {
+        std::cout << QString("ログファイルが存在しないため作成します %1").arg(filepath).toStdString() << std::endl;
+
+        if (File.open(QIODevice::WriteOnly)) {
+            File.close();
+        }
+        else {
+            std::cerr << QString("エラー : ログファイルを作成に失敗 %1").arg(File.errorString()).toStdString() << std::endl;
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+
+#ifdef _BELOW_0_1_0
+int Runner::setLogFile()
+{
+    QString logDir  = "";
+    QString logFile = "";
 
     if (m_User.compare("root", Qt::CaseSensitive) == 0) {
         // スーパーユーザの場合は、/var/log/qNewsFlash_log.jsonファイル
@@ -1657,44 +1802,7 @@ int Runner::writeLog(Article &article)
 
     return 0;
 }
-
-
-int Runner::setLogFile(QString &filepath)
-{
-    // 書き込み済み(ログ用)のJSONファイルの情報を取得
-    QFileInfo fileInfo(filepath);
-
-    // 書き込み済み(ログ用)のJSONファイルを保存するディレクトリのパスを取得
-    auto dirPath = fileInfo.absolutePath();
-
-    // 書き込み済み(ログ用)のJSONファイルを保存するディレクトリを確認
-    QDir logDir(dirPath);
-    if (!logDir.exists()) {
-        // ディレクトリが存在しない場合は作成
-        std::cout << QString("ログディレクトリが存在しないため作成します %1").arg(logDir.absolutePath()).toStdString() << std::endl;
-
-        if (!logDir.mkpath(".")) {
-            std::cerr << QString("エラー : ログディレクトリの作成に失敗 %1").arg(logDir.absolutePath()).toStdString() << std::endl;
-            return -1;
-        }
-    }
-
-    // 書き込み済み(ログ用)のJSONファイルが存在しない場合は空のログファイルを作成
-    QFile File(filepath);
-    if (!File.exists()) {
-        std::cout << QString("ログファイルが存在しないため作成します %1").arg(filepath).toStdString() << std::endl;
-
-        if (File.open(QIODevice::WriteOnly)) {
-            File.close();
-        }
-        else {
-            std::cerr << QString("エラー : ログファイルを作成に失敗 %1").arg(File.errorString()).toStdString() << std::endl;
-            return -1;
-        }
-    }
-
-    return 0;
-}
+#endif
 
 
 int Runner::deleteLogNotToday()
@@ -1755,7 +1863,7 @@ int Runner::deleteLogNotToday()
     catch (QException &ex) {
         File.close();
 
-        std::cerr << QString("エラー : ファイルの書き込みに失敗").toStdString() << std::endl;
+        std::cerr << QString("エラー : ログファイルの書き込みに失敗").toStdString() << std::endl;
         return -1;
     }
 
@@ -1806,4 +1914,20 @@ int Runner::getDatafromWrittenLog()
     }
 
     return 0;
+}
+
+
+// [q]キーまたは[Q]キー ==> [Enter]キーを押下した場合、メインループを抜けてアプリケーションを終了する
+void Runner::onReadyRead()
+{
+    // 標準入力から1行のみ読み込む
+    QTextStream tstream(stdin);
+    QString line = tstream.readLine();
+
+    if (line.compare("q", Qt::CaseSensitive) == 0) {
+        m_stopRequested.store(true);
+
+        QCoreApplication::exit();
+        return;
+    }
 }

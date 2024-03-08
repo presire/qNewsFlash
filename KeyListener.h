@@ -8,11 +8,17 @@
 
 class KeyListener : public QThread
 {
+    Q_OBJECT
+
+private:
+    std::atomic<bool> m_stopRequested;
+
 public:
     KeyListener();
-    virtual ~KeyListener();
+    ~KeyListener() override;
 
     void run() override;
+    void stop();
 };
 
 #endif // KEYLISTENER_H

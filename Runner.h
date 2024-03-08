@@ -5,12 +5,19 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QTimer>
+
+#ifdef Q_OS_LINUX
+    #include <QSocketNotifier>
+#elif Q_OS_WIN
+    #include <QWinEventNotifier>
+    #include <windows.h>
+#endif
+
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <tuple>
 #include <memory>
 #include "Article.h"
-#include "KeyListener.h"
 #include "Poster.h"
 
 
@@ -22,7 +29,12 @@ private:  // Variables
     QStringList                             m_args;         // コマンドラインオプション
     QString                                 m_User;         // このソフトウェアを実行しているユーザ名
     QString                                 m_SysConfFile;  // このソフトウェアの設定ファイルのパス
+    bool                                    m_AutoFetch;    // メンバ変数m_intervalの値を使用して自動的にニュース記事を取得するかどうか
+
+#ifdef _BELOW_0_1_0
     QString                                 m_WriteFile;    // スレッド書き込み用のJSONファイルのパス
+#endif
+
     QString                                 m_LogFile;      // スレッド書き込み済みのJSONファイルのパス
                                                             // qNewsFlash.jsonファイルに設定を記述する
                                                             // デフォルト : /var/log/qNewsFlash_log.json
@@ -36,7 +48,8 @@ private:  // Variables
     bool                                    m_bHanJ;        // ハンギョレジャパンからニュース記事を取得するかどうか
     QString                                 m_API;          // News APIのキー
     QStringList                             m_ExcludeMedia; // News APIからのニュース記事において、除外するメディアのURL
-    unsigned long long                      m_MaxParagraph; // 本文の一部を抜粋する場合の最大文字数
+    long long                               m_MaxParagraph; // 本文の一部を抜粋する場合の最大文字数
+    int                                     m_WithinHours;  // 公開日がn時間前以内のニュース記事を取得する
     QString                                 m_LastUpdate;   // 最後にニュース記事群を取得した日付 (フォーマット : yyyy/M/d)
     std::unique_ptr<QNetworkAccessManager>  manager;        // ニュース記事を取得するためのネットワークオブジェクト
     QNetworkReply                           *m_pReply;      // News API用HTTPレスポンスのオブジェクト
@@ -45,19 +58,30 @@ private:  // Variables
     QNetworkReply                           *m_pReplyAsahi; // 朝日デジタル用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyCNet;  // CNET用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyHanJ;  // ハンギョレジャパン用HTTPレスポンスのオブジェクト
-    std::unique_ptr<KeyListener>            m_pListener;    // このソフトウェアを終了するためのキーボードシーケンスオブジェクト
     QList<Article>                          m_BeforeWritingArticles;  // Webから取得したニュース記事群
     QList<Article>                          m_WrittenArticles;        // スレッド書き込み済みの記事群のログ
     QString                                 m_RequestURL;   // 記事を書き込むためのPOSTデータを送信するURL
     THREAD_INFO                             m_ThreadInfo;   // 記事を書き込むスレッドの情報
 
+#ifdef Q_OS_LINUX
+    std::unique_ptr<QSocketNotifier>        m_pNotifier;    // このソフトウェアを終了するためのキーボードシーケンスオブジェクト
+#elif Q_OS_WIN
+    std::unique_ptrQWinEventNotifier>       m_pNotifier;    // このソフトウェアを終了するためのキーボードシーケンスオブジェクト
+#endif
+
+    std::atomic<bool>                       m_stopRequested;
+
 public:  // Variables
 
 private:  // Methods
     int         getConfiguration(QString &filepath);        // このソフトウェアの設定ファイルの情報を取得
-    [[maybe_unused]] void        GetOption();                                // コマンドラインオプションの取得 (現在は未使用)
-    [[maybe_unused]] int         setLogFile();                               // このソフトウェアのログ情報を保存するファイルのパスを設定
+    void        GetOption();                                // コマンドラインオプションの取得 (現在は未使用)
+
+#ifdef _BELOW_0_1_0
+    int         setLogFile();                               // このソフトウェアのログ情報を保存するファイルのパスを設定
                                                             // ログ情報とは、本日の書き込み済みのニュース記事群を指す
+#endif
+
     static int  setLogFile(QString &filepath);              // このソフトウェアのログ情報を保存するファイルのパスを設定
                                                             // ログ情報とは、書き込み済みのニュース記事を指す
     int         deleteLogNotToday();                        // ログ情報を保存するファイルから、昨日以前(昨日も含む)の書き込み済みのニュース記事を削除
@@ -69,22 +93,30 @@ private:  // Methods
     void        itemTagsforAsahi(xmlNode *a_node);          // 朝日デジタルのニュース記事(RSS)を分解して取得
     void        itemTagsforCNet(xmlNode *a_node);           // CNET Japanのニュース記事(RSS)を分解して取得
     void        itemTagsforHanJ(xmlNode *a_node);           // ハンギョレジャパンのニュース記事(RSS)を分解して取得
-    QString     convertJPDate(QString &strDate);            // News APIのニュース記事にある日付を日本時間および"yyyy/M/d h時m分"に変換
-    QString     convertJPDateforKyodo(QString &strDate);    // News APIのニュース記事にある日付を日本時間および"yyyy/M/d h時m分"に変換
-    QString     convertDate(QString &strDate);              // 時事ドットコムのニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
-    QString     convertDateHanJ(QString &strDate);          // ハンギョレジャパンのニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
-    static bool isToday(const QString &dateString);         // ニュース記事が今日の日付かどうかを確認
+    static QString convertJPDate(QString &strDate);         // News APIのニュース記事にある日付を日本時間および"yyyy/M/d h時m分"に変換
+    static QString convertJPDateforKyodo(QString &strDate); // News APIのニュース記事にある日付を日本時間および"yyyy/M/d h時m分"に変換
+    static QString convertDate(QString &strDate);           // 時事ドットコムのニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
+    static QString convertDateHanJ(QString &strDate);       // ハンギョレジャパンのニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
+    bool isToday(const QString &dateString);                // ニュース記事が今日の日付かどうかを確認
+    bool isHoursAgo(const QString &dateString);             // ニュース記事が数時間前の日付かどうかを確認
     Article     selectArticle();                            // 取得したニュース記事群からランダムで1つを選択
+
 #ifdef _BELOW_0_1_0
     int         writeJSON(Article &article);                // 選択したニュース記事をJSONファイルに保存
     int         truncateJSON();                             // スレッド書き込み用のJSONファイルの内容を空にする
 #endif
+
     int         writeLog(Article &article);                 // 書き込み済みのニュース記事をJSONファイルに保存
-    int         updateDateJson(const QString &currentDate); // 最後にニュース記事を取得した日付 (フォーマット : "yyyy/M/d")
+    int         updateDateJson(const QString &currentDate); // 最後にニュース記事を取得した日付を設定ファイルに保存 (フォーマット : "yyyy/M/d")
 
 public:  // Methods
-    explicit    Runner(QStringList args, QObject *parent = nullptr);
+
+#ifdef Q_OS_LINUX
     explicit    Runner(QStringList args, QString user, QObject *parent = nullptr);
+#elif Q_OS_WIN
+    explicit    Runner(QStringList args, QObject *parent = nullptr);
+#endif
+
     ~Runner() override = default;
 
 signals:
@@ -104,6 +136,7 @@ public slots:
     void fetchAsahiRSS();   // 朝日デジタルからニュース記事の取得後に実行するスロット
     void fetchCNetRSS();    // CNET Japanからニュース記事の取得後に実行するスロット
     void fetchHanJRSS();    // ハンギョレジャパンからニュース記事の取得後に実行するスロット
+    void onReadyRead();     // ノンブロッキングでキー入力を受信するスロット
 };
 
 #endif // RUNNER_H

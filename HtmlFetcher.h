@@ -16,18 +16,18 @@ class HtmlFetcher : public QObject
     Q_OBJECT
 
 private:  // Variables
-    unsigned long long                      m_MaxParagraph;
+    long long                               m_MaxParagraph;
     std::unique_ptr<QNetworkAccessManager>  m_pManager;
     QString                                 m_Paragraph;
 
 private:  // Methods
-    int fetchParagraph(QNetworkReply *reply, QString _xpath);
+    int fetchParagraph(QNetworkReply *reply, const QString& _xpath);
     xmlXPathObjectPtr getNodeset(xmlDocPtr doc, const xmlChar *xpath);
 
 public:   // Methods
-    explicit HtmlFetcher(unsigned long long maxParagraph, QObject *parent = nullptr);
+    explicit HtmlFetcher(long long maxParagraph, QObject *parent = nullptr);
     virtual  ~HtmlFetcher();
-    int      fetch(const QUrl &url, bool redirect = false, QString _xpath = "//head/meta[@name='description']/@content");
+    int      fetch(const QUrl &url, bool redirect = false, const QString& _xpath = "//head/meta[@name='description']/@content");
     QString  getParagraph() const;
 
 signals:
