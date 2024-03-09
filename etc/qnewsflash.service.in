@@ -9,7 +9,7 @@ ExecStart=@CMAKE_INSTALL_PREFIX@/bin/qNewsFlash --sysconf=@SYSCONF_DIR@/qNewsFla
 ExecReload=/bin/kill -HUP  $MAINPID
 ExecStop=/bin/kill   -TERM $MAINPID
 PIDFile=@PID@/qNewsFlash.pid
-Restart=no
+Restart=on-success
 
 [Install]
 WantedBy=multi-user.target

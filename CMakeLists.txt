@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.15)
-project(qNewsFlash VERSION 0.1.1 LANGUAGES CXX)
+project(qNewsFlash VERSION 0.1.2 LANGUAGES CXX)
 
 
 # Linuxのみビルドを許可
 if(NOT UNIX OR APPLE)
-  message(FATAL_ERROR "${qNewsFlash}は、Linuxのみでビルドできます")
+  message(FATAL_ERROR "本ソフトウェアは、Linuxでのみビルドできます")
 endif()
 
 
@@ -16,10 +16,28 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
+# ARMまたはAARCH64かどうかを確認
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    # NEONをサポートする場合 (主に64ビットARM)
+    include(CheckCXXCompilerFlag)
+    CHECK_CXX_COMPILER_FLAG("-mfpu=neon" COMPILER_SUPPORTS_NEON)
+    if(COMPILER_SUPPORTS_NEON)
+        target_compile_definitions(qNewsFlash PRIVATE ARM_NEON)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon")
+    endif()
+
+    # WMMXをサポートする場合 (主に32ビットARM)
+    # WMMXのサポートは、特定のコンパイラやプラットフォームに依存する可能性があるため、
+    # 実際にコンパイラがWMMXをサポートしているかどうかを確認する必要がある
+    CHECK_CXX_COMPILER_FLAG("-march=armv7-a+simd" COMPILER_SUPPORTS_WMMX)
+    if(COMPILER_SUPPORTS_WMMX)
+        target_compile_definitions(qNewsFlash PRIVATE ARM_WMMX)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv7-a+simd")
+    endif()
+endif()
+
+
 # ビルドタイプ
-#if(CMAKE_BUILD_TYPE STREQUAL "")
-#    set(CMAKE_BUILD_TYPE "Release")
-#endif()
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "")
 
 ## ビルドタイプを表示

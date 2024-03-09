@@ -7,7 +7,15 @@
 #include <cstdint>
 
 #ifdef Q_OS_LINUX
-#include <x86intrin.h>
+    #if defined(__x86_64__) || defined(__i386__)
+    #include <x86intrin.h>
+    #endif
+
+    #ifdef ARM_NEON
+    #include <arm_neon.h>
+    #elif ARM_WMMX
+    #include <mmintrin.h>
+    #endif
 #elif Q_OS_WIN
 #include <intrin.h>
 #endif
@@ -20,6 +28,7 @@ private:  // Variables
 
 private:  // Methods
     unsigned long long getTSC();                         // CPUのタイムスタンプカウンタ(TSC)を取得
+    unsigned long long csprng();                         // システムが提供する暗号論的に安全な乱数生成器(CSPRNG)から値を取得
     unsigned long long hashTSC(unsigned long long tsc);  // CPUのタイムスタンプカウンタ(TSC)の値にハッシュ処理を施す
     uint64_t           next();                           // シード用Xorshift
 

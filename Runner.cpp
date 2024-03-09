@@ -36,7 +36,6 @@ Runner::Runner(QStringList _args, QObject *parent) : m_args(std::move(_args)), m
     connect(&m_timer, &QTimer::timeout, this, &Runner::fetch);
     connect(m_pNotifier.get(), &QWinEventNotifier::activated, this, &Runner::onReadyRead);  // キーボードシーケンスの有効化
 }
-
 #endif
 
 
@@ -149,10 +148,12 @@ void Runner::run()
         if (m_interval == 0) {
             std::cerr << "インターバルの値が未指定もしくは0のため、30[分]に設定されます" << std::endl;
             m_interval = 60 * 1000 * 30;
-        } else if (m_interval < (60 * 1000 * 3)) {
+        }
+        else if (m_interval < (60 * 1000 * 3)) {
             std::cerr << "インターバルの値が3[分]未満のため、3[分]に設定されます" << std::endl;
             m_interval = 60 * 1000 * 3;
-        } else if (m_interval < 0) {
+        }
+        else if (m_interval < 0) {
             std::cerr << "インターバルの値が不正です" << std::endl;
 
             QCoreApplication::exit();
@@ -394,15 +395,15 @@ void Runner::fetch()
         }
 #endif
 
+        // 書き込み済みの記事を履歴として登録 (同じ記事を1日に2回以上書き込まないようにする)
+        // ただし、1日過ぎた場合は書き込み済み記事の履歴を削除する
+        m_WrittenArticles.append(article);
+
         // ログファイルに書き込む
         if (writeLog(article)) {
             QCoreApplication::exit();
             return;
         }
-
-        // 書き込み済みの記事を履歴として登録 (同じ記事を1日に2回以上書き込まないようにする)
-        // ただし、1日過ぎた場合は書き込み済み記事の履歴を削除する
-        m_WrittenArticles.append(article);
     }
 #ifdef _BELOW_0_1_0
     // qNewsFlash 0.1.0未満の機能
@@ -447,6 +448,7 @@ void Runner::fetchNewsAPI()
             auto convDate = Runner::convertJPDate(utcDate);
 
             // ニュースの公開日を確認
+            // 今日のニュース記事ではない場合、または、指定時間以内のニュース記事ではない場合は無視
             auto isCheckDate = m_WithinHours == 0 ? isToday(convDate) : isHoursAgo(convDate);
             if (!isCheckDate) {
                 continue;
@@ -584,7 +586,7 @@ void Runner::itemTagsforJiJi(xmlNode *a_node)
                 itemChild = itemChild->next;
             }
 
-            // 今日のニュースではない場合は無視
+            // 今日のニュース記事ではない場合、または、指定時間以内のニュース記事ではない場合は無視
             if (bSkipNews) continue;
 
             // 既に書き込み済みの記事の場合は無視
@@ -717,7 +719,7 @@ void Runner::itemTagsforKyodo(xmlNode *a_node)
                 itemChild = itemChild->next;
             }
 
-            // 今日のニュースではない場合は無視
+            // 今日のニュース記事ではない場合、または、指定時間以内のニュース記事ではない場合は無視
             if (bSkipNews) continue;
 
             // 既に書き込み済みの記事の場合は無視
@@ -842,7 +844,7 @@ void Runner::itemTagsforAsahi(xmlNode *a_node)
                 itemChild = itemChild->next;
             }
 
-            // 今日のニュースではない場合は無視
+            // 今日のニュース記事ではない場合、または、指定時間以内のニュース記事ではない場合は無視
             if (bSkipNews) continue;
 
             // 既に書き込み済みの記事の場合は無視
@@ -965,7 +967,7 @@ void Runner::itemTagsforCNet(xmlNode *a_node)
                 itemChild = itemChild->next;
             }
 
-            // 今日のニュースではない場合は無視
+            // 今日のニュース記事ではない場合、または、指定時間以内のニュース記事ではない場合は無視
             if (bSkipNews) continue;
 
             // 既に書き込み済みの記事の場合は無視
@@ -1098,7 +1100,7 @@ void Runner::itemTagsforHanJ(xmlNode *a_node)
                 itemChild = itemChild->next;
             }
 
-            // 今日のニュースではない場合は無視
+            // 今日のニュース記事ではない場合、または、指定時間以内のニュース記事ではない場合は無視
             if (bSkipNews) continue;
 
             // 既に書き込み済みの記事の場合は無視

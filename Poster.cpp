@@ -71,7 +71,7 @@ int Poster::Post(const QUrl &url, THREAD_INFO &threadInfo)
     else {
         // Shift-JIS用
         QString postMessage = QString("subject=%1&FROM=%2&mail=%3&MESSAGE=%4&bbs=%5&time=%6&key=%7")
-                                  .arg(threadInfo.subject,
+                                  .arg(threadInfo.subject,  // スレッドのタイトル (スレッドを立てる場合のみ入力)
                                        threadInfo.from,
                                        threadInfo.mail,     // メール欄
                                        threadInfo.message,  // 書き込む内容

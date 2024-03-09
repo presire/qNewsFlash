@@ -13,7 +13,7 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 * News API (無料版のNews APIはニュース記事が1日遅れのため、デフォルトでは無効)  
 * 時事ドットコム  
 * 共同通信  
-* 朝日新聞デジタル (ただし、有料記事が多いです)  
+* 朝日新聞デジタル (ただし、フィードに掲載されている記事には有料記事が多い)  
 * CNET Japan  
 * ハンギョレ新聞  
 
@@ -68,6 +68,11 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
     sudo zypper install coreutils make cmake gcc gcc-c++ libxml2-devel \  
                         libqt5-qtbase-common-devel libQt5Core-devel    \  
                         libQt5Network-devel  
+
+    # Debian GNU/Linux  
+    sudo apt update && sudo apt upgrade  
+    sudo apt install coreutils make cmake gcc libxml2 libxml2-dev \  
+                     qtbase5-dev  
 <br>
 <br>
 
@@ -121,14 +126,14 @@ Ninjaビルドを使用する場合は、<code>cmake</code>コマンドに<code>
   <br>
   libxml 2.0ライブラリのpkgconfigディレクトリのパスを指定することにより、  
   任意のディレクトリにインストールされているlibxml 2.0ライブラリを使用して、このソフトウェアをコンパイルすることができます。  
-  通常は、あまり使用しないと思われます。  
+  通常、あまり使用しないと思われます。  
 
 <br>
 
     cmake -DCMAKE_BUILD_TYPE=Release \  
           -DCMAKE_INSTALL_PREFIX=<"qNewsFlashのインストールディレクトリ"> \  
           -SYSCONF_DIR=<"設定ファイルのインストールディレクトリ">           \  
-          -DSYSTEMD=user  \  # Systemdサービスファイルをユーザディレクトリにインストールする場合  
+          -DSYSTEMD=user  \  # Systemdサービスファイルをホームディレクトリにインストールする場合  
           -DPID=/tmp      \  # Systemdサービスを使用する場合
           ..  
     
@@ -183,10 +188,10 @@ Systemdサービスを使用せずに、qNewsFlashを実行することもでき
     qNewsFlash --sysconf=<設定ファイル qNewsFlash.jsonのパス>  
 <br>
 
-直接実行した場合において、**[q]キー** または **[Q]キー** ==> **[Enter]キー** を押下することにより、qNewsFlashを終了することができます。  
+直接実行した場合において、**[q]キー** または **[Q]キー** ==> **[Enter]キー** を押下することにより、本ソフトウェアを終了することができます。  
 <br>
 
-## 2.3 設定ファイル qNewsFlash.jsonのautofetchを無効にしている場合
+## 2.4 設定ファイル qNewsFlash.jsonのautofetchを無効にしている場合
 
 ワンショット機能を有効にしている状態でSystemdサービスから起動する場合は、qnewsflash.serviceファイルの設定を変更する必要があります。  
 qnewsflash.serviceファイルを開いて、<code>[Service]</code>セクションの<code>Type</code>キーの値を、<code>oneshot</code>に変更します。  
@@ -197,22 +202,22 @@ qnewsflash.serviceファイルを開いて、<code>[Service]</code>セクショ�
 <br>
 
 **Systemdサービスの設定例**  
-[Service]  
-Type=oneshot  
-ExecStart=/<qNewsFlashのインストールディレクトリ>/bin/qNewsFlash --sysconf=<qNewsFlash.jsonのパス>  
-ExecReload=/bin/kill -HUP  $MAINPID  
-#ExecStop=/bin/kill   -TERM $MAINPID  
-PIDFile=<qNewsFlash.pidのパス>  
-Restart=no  
+  [Service]  
+  Type=oneshot  
+  ExecStart=/<qNewsFlashのインストールディレクトリ>/bin/qNewsFlash --sysconf=<qNewsFlash.jsonのパス>  
+  ExecReload=/bin/kill -HUP  $MAINPID  
+  #ExecStop=/bin/kill   -TERM $MAINPID  
+  PIDFile=<qNewsFlash.pidのパス>  
+  Restart=on-success  
 
 <br>
 <br>
 
 
-# 3. ラッパーシェルスクリプト - qNewsFlash.sh
+# 3. ラッパーシェルスクリプト - qNewsFlash.shファイル
 
 このソフトウェアには、Qt 5ライブラリが同梱されております。  
-もし、Qt 5ライブラリがインストールできない環境でも、qNewsFlash.shファイルを使用することにより、ソフトウェアを動作させることができる可能性があります。  
+もし、Qt 5ライブラリがインストールできない環境でも、ラッパーシェルスクリプトを実行することにより、ソフトウェアを動作させることができる可能性があります。  
 <br>
 
 なお、qNewsFlash.shファイルは、qNewsFlashファイルと同階層のディレクトリにインストールされております。  
@@ -379,6 +384,8 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   <br>
 * subject  
   デフォルト値 : 空欄  
+  スレッドを立てる時のタイトルを指定します。　　
+  <br>
   POSTデータとして送信します。  
   <br>
 * from  
@@ -398,10 +405,12 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   <br>
 * time  
   デフォルト値 : 空欄  
-  書き込む時間を指定します。  
+  書き込む時刻を指定します。  
+  この時刻は、エポックタイム (UnixタイムまたはPOSIXタイムとも呼ばれる) を指します。  
+  これは、1970年1月1日00:00:00 UTCからの経過秒数を表しています。  
+  <br>
   掲示板によっては、この値は意味をなさない可能性があります。  
   POSTデータとして送信します。  
-  書き込み時に必須だと思われます。  
   <br>
 * key  
   デフォルト値 : 空欄  
@@ -420,6 +429,7 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
       "api": "",  
       "asahi": false,  
       "autofetch": true,  
+      "bbs": "",  
       "cnet": true,  
       "exclude": [  
         "Kbc.co.jp",  
@@ -431,23 +441,23 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
         "Jleague.jp",  
         "YouTube"  
       ],  
+      "from": "",  
       "hanj": false,  
       "interval": "1800",  
       "jiji": true,  
+      "key": "",  
       "kyodo": true,  
       "logfile": "/var/log/qNewsFlash_log.json",  
+      "mail": "",  
       "maxpara": "100",  
       "newsapi": false,  
-      "update": "",  
-      "writefile": "/tmp/qNewsFlashWrite.json",  
       "requesturl": "",  
+      "shiftjis": true,  
       "subject": "",  
-      "from": "",  
-      "mail": "",  
-      "bbs": "",  
       "time": "",  
-      "key": "",  
-      "shiftjis": true  
+      "update": "",  
+      "withinhours": "0",
+      "writefile": "/tmp/qNewsFlashWrite.json"  
     }  
 <br>
 <br>
