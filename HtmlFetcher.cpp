@@ -49,7 +49,8 @@ int HtmlFetcher::fetchParagraph(QNetworkReply *reply, const QString& _xpath)
     LIBXML_TEST_VERSION
 
     // 文字列からHTMLドキュメントをパース
-    xmlDocPtr doc = htmlReadDoc((const xmlChar*)htmlContent.toStdString().c_str(), nullptr, nullptr, HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+    // libxml2ではエンコーディングの自動判定において問題があるため、エンコーディングを明示的に指定する
+    xmlDocPtr doc = htmlReadDoc((const xmlChar*)htmlContent.toStdString().c_str(), nullptr, "UTF-8", HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
     if (doc == nullptr) {
         std::cerr << "Document not parsed successfully" << std::endl;
         reply->deleteLater();
@@ -59,7 +60,6 @@ int HtmlFetcher::fetchParagraph(QNetworkReply *reply, const QString& _xpath)
 
     // XPathで特定の要素を検索
     //xmlChar *xpath = (xmlChar*) "//head/meta[@name='description']/@content";
-    //auto pXPath = _xpath.toLocal8Bit().data();
     auto *xpath = xmlStrdup((const xmlChar*)_xpath.toUtf8().constData());
     xmlXPathObjectPtr result = getNodeset(doc, xpath);
     if (result == nullptr) {

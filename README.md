@@ -16,6 +16,7 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 * 朝日新聞デジタル (ただし、フィードに掲載されている記事には有料記事が多い)  
 * CNET Japan  
 * ハンギョレ新聞  
+* ロイター通信
 
 <br>
 
@@ -326,6 +327,11 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   ハンギョレ新聞 ジャパンからニュースを取得するかどうかを指定します。  
   デフォルトは無効です。  
   <br>
+* reuters  
+  デフォルト値 : <code>false</code>  
+  ロイター通信からニュースを取得するかどうかを指定します。  
+  デフォルトは無効です。  
+  <br>
 * autofetch  
   デフォルト値 : <code>true</code>  
   タイマ (<code>interval</code>キーの値を使用) を使用して、ニュース記事を自動取得するかどうかを指定します。  
@@ -457,6 +463,7 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
       "maxpara": "100",  
       "newsapi": false,  
       "requesturl": "",  
+      "reuters": false,  
       "shiftjis": true,  
       "subject": "",  
       "time": "",  

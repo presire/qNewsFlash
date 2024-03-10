@@ -25,6 +25,7 @@
     "maxpara": "100",
     "newsapi": false,
     "requesturl": "",
+    "reuters": true,
     "shiftjis": true,
     "subject": "",
     "time": "",

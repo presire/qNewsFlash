@@ -43,9 +43,10 @@ private:  // Variables
     bool                                    m_bNewsAPI;     // News APIからニュース記事を取得するかどうか
     bool                                    m_bJiJi;        // 時事ドットコムからニュース記事を取得するかどうか
     bool                                    m_bKyodo;       // 共同通信からニュース記事を取得するかどうか
-    bool                                    m_bAsahi;       // 朝日デジタルからニュース記事を取得するかどうか
+    bool                                    m_bAsahi;       // 朝日新聞デジタルからニュース記事を取得するかどうか
     bool                                    m_bCNet;        // CNET Japanからニュース記事を取得するかどうか
     bool                                    m_bHanJ;        // ハンギョレジャパンからニュース記事を取得するかどうか
+    bool                                    m_bReuters;     // ロイター通信からニュース記事を取得するかどうか
     QString                                 m_API;          // News APIのキー
     QStringList                             m_ExcludeMedia; // News APIからのニュース記事において、除外するメディアのURL
     long long                               m_MaxParagraph; // 本文の一部を抜粋する場合の最大文字数
@@ -55,9 +56,10 @@ private:  // Variables
     QNetworkReply                           *m_pReply;      // News API用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyJiJi;  // 時事ドットコム用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyKyodo; // 共同通信用HTTPレスポンスのオブジェクト
-    QNetworkReply                           *m_pReplyAsahi; // 朝日デジタル用HTTPレスポンスのオブジェクト
+    QNetworkReply                           *m_pReplyAsahi; // 朝日新聞デジタル用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyCNet;  // CNET用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyHanJ;  // ハンギョレジャパン用HTTPレスポンスのオブジェクト
+    QNetworkReply                           *m_pReplyReuters;         // ロイター通信用HTTPレスポンスのオブジェクト
     QList<Article>                          m_BeforeWritingArticles;  // Webから取得したニュース記事群
     QList<Article>                          m_WrittenArticles;        // スレッド書き込み済みの記事群のログ
     QString                                 m_RequestURL;   // 記事を書き込むためのPOSTデータを送信するURL
@@ -90,12 +92,13 @@ private:  // Methods
                                                             // ただし、このメソッドは、deleteLogNotToday()メソッドの直後に実行する必要がある
     void        itemTagsforJiJi(xmlNode *a_node);           // 時事ドットコムのニュース記事(RSS)を分解して取得
     void        itemTagsforKyodo(xmlNode *a_node);          // 共同通信のニュース記事(RSS)を分解して取得
-    void        itemTagsforAsahi(xmlNode *a_node);          // 朝日デジタルのニュース記事(RSS)を分解して取得
+    void        itemTagsforAsahi(xmlNode *a_node);          // 朝日新聞デジタルのニュース記事(RSS)を分解して取得
     void        itemTagsforCNet(xmlNode *a_node);           // CNET Japanのニュース記事(RSS)を分解して取得
     void        itemTagsforHanJ(xmlNode *a_node);           // ハンギョレジャパンのニュース記事(RSS)を分解して取得
+    void        itemTagsforReuters(xmlNode *a_node);        // ロイター通信のニュース記事(RSS)を分解して取得
     static QString convertJPDate(QString &strDate);         // News APIのニュース記事にある日付を日本時間および"yyyy/M/d h時m分"に変換
     static QString convertJPDateforKyodo(QString &strDate); // News APIのニュース記事にある日付を日本時間および"yyyy/M/d h時m分"に変換
-    static QString convertDate(QString &strDate);           // 時事ドットコムのニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
+    static QString convertDate(QString &strDate);           // 時事ドットコム、ロイター通信のニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
     static QString convertDateHanJ(QString &strDate);       // ハンギョレジャパンのニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
     bool isToday(const QString &dateString);                // ニュース記事が今日の日付かどうかを確認
     bool isHoursAgo(const QString &dateString);             // ニュース記事が数時間前の日付かどうかを確認
@@ -123,9 +126,10 @@ signals:
     void NewAPIfished();    // News APIからニュース記事の取得の終了を知らせるためのシグナル
     void JiJifinished();    // 時事ドットコムからニュース記事の取得の終了を知らせるためのシグナル
     void Kyodofinished();   // 共同通信からニュース記事の取得の終了を知らせるためのシグナル
-    void Asahifinished();   // 朝日デジタルからニュース記事の取得の終了を知らせるためのシグナル
+    void Asahifinished();   // 朝日新聞デジタルからニュース記事の取得の終了を知らせるためのシグナル
     void CNetfinished();    // CNET Japanからニュース記事の取得の終了を知らせるためのシグナル
     void HanJfinished();    // ハンギョレジャパンからニュース記事の取得の終了を知らせるためのシグナル
+    void Reutersfinished(); // ロイター通信からニュース記事の取得の終了を知らせるためのシグナル
 
 public slots:
     void run();             // このソフトウェアを最初に実行する時にのみ実行するメイン処理
@@ -133,9 +137,10 @@ public slots:
     void fetchNewsAPI();    // News APIからニュース記事の取得後に実行するスロット
     void fetchJiJiRSS();    // 時事ドットコムからニュース記事の取得後に実行するスロット
     void fetchKyodoRSS();   // 共同通信からニュース記事の取得後に実行するスロット
-    void fetchAsahiRSS();   // 朝日デジタルからニュース記事の取得後に実行するスロット
+    void fetchAsahiRSS();   // 朝日新聞デジタルからニュース記事の取得後に実行するスロット
     void fetchCNetRSS();    // CNET Japanからニュース記事の取得後に実行するスロット
     void fetchHanJRSS();    // ハンギョレジャパンからニュース記事の取得後に実行するスロット
+    void fetchReutersRSS(); // ロイター通信からニュース記事の取得後に実行するスロット
     void onReadyRead();     // ノンブロッキングでキー入力を受信するスロット
 };
 
