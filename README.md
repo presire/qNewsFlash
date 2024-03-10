@@ -24,7 +24,7 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 
 この記事では、Red Hat Enterprise LinuxおよびSUSE Linux Enterprise / openSUSEを前提に記載しております。  
 また、他のLinuxディストリビューションにもインストールして使用できると思います。  
-(例: Debian GNU/Linux, Fedora, Manjaro, ... 等)  
+(例: Linux Mint, Manjaro, MX Linux, ... 等)  
 <br>
 
 **注意：**  
@@ -42,9 +42,9 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 * Qt5 Network
   * <https://www.qt.io/>  
   * qNewsFlashは、Qtライブラリを使用しています。
-  * 上記で使用しているQtライブラリは、LGPL v3オープンソースライセンスの下で利用可能です。  
+  * 本ソフトウェアで使用しているQtライブラリは、LGPL v3オープンソースライセンスの下で利用可能です。  
   * Qtのライセンスファイルは、以下に示すファイルで確認できます。  
-    <I>**LibraryLicenses/Qt/LGPL-3.0**</I>  
+    <I>**LibraryLicenses/Qt/LICENSE.LGPLv3**</I>  
 <br>
 
 * libxml 2.0
@@ -69,7 +69,7 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
                         libqt5-qtbase-common-devel libQt5Core-devel    \  
                         libQt5Network-devel  
 
-    # Debian GNU/Linux  
+    # Debian GNU/Linux, Raspberry Pi OS  
     sudo apt update && sudo apt upgrade  
     sudo apt install coreutils make cmake gcc libxml2 libxml2-dev \  
                      qtbase5-dev  
@@ -131,8 +131,8 @@ Ninjaビルドを使用する場合は、<code>cmake</code>コマンドに<code>
 <br>
 
     cmake -DCMAKE_BUILD_TYPE=Release \  
-          -DCMAKE_INSTALL_PREFIX=<"qNewsFlashのインストールディレクトリ"> \  
-          -SYSCONF_DIR=<"設定ファイルのインストールディレクトリ">           \  
+          -DCMAKE_INSTALL_PREFIX=<qNewsFlashのインストールディレクトリ> \  
+          -DSYSCONF_DIR=<設定ファイルのインストールディレクトリ>          \  
           -DSYSTEMD=user  \  # Systemdサービスファイルをホームディレクトリにインストールする場合  
           -DPID=/tmp      \  # Systemdサービスを使用する場合
           ..  
@@ -183,20 +183,25 @@ qNewsFlashを停止する場合は、以下に示すコマンドを実行しま�
 
 Systemdサービスを使用せずに、qNewsFlashを実行することもできます。  
 
-    sudo qNewsFlash --sysconf=<設定ファイル qNewsFlash.jsonのパス>
+    sudo qNewsFlash --sysconf=<qNewsFlash.jsonのパス>
     または
-    qNewsFlash --sysconf=<設定ファイル qNewsFlash.jsonのパス>  
+    qNewsFlash --sysconf=<qNewsFlash.jsonのパス>  
 <br>
 
 直接実行した場合において、**[q]キー** または **[Q]キー** ==> **[Enter]キー** を押下することにより、本ソフトウェアを終了することができます。  
 <br>
 
-## 2.4 設定ファイル qNewsFlash.jsonのautofetchを無効にしている場合
+## 2.4 ワンショット機能とSystemdサービス
+
+**※ ワンショット機能を有効にする場合は、Cronの使用を推奨します。**  
+<br>
 
 ワンショット機能を有効にしている状態でSystemdサービスから起動する場合は、qnewsflash.serviceファイルの設定を変更する必要があります。  
+
 qnewsflash.serviceファイルを開いて、<code>[Service]</code>セクションの<code>Type</code>キーの値を、<code>oneshot</code>に変更します。  
 
-併せて、<code>ExecStop</code>キーの行をコメントアウトします。  
+併せて、<code>ExecStop</code>キーの行をコメントアウトして、  
+<code>Restart</code>キーの値を<code>no</code>に設定します。  
 
 以下のSystemdサービスファイルの設定例をご参照ください。  
 <br>
@@ -208,7 +213,7 @@ qnewsflash.serviceファイルを開いて、<code>[Service]</code>セクショ�
   ExecReload=/bin/kill -HUP  $MAINPID  
   #ExecStop=/bin/kill   -TERM $MAINPID  
   PIDFile=<qNewsFlash.pidのパス>  
-  Restart=on-success  
+  Restart=no  
 
 <br>
 <br>
@@ -323,10 +328,10 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   <br>
 * autofetch  
   デフォルト値 : <code>true</code>  
-  タイマ (<code>interval</code>キーの値を使用) を使用して、ニュース記事を自動取得するかどうかを指定する。  
+  タイマ (<code>interval</code>キーの値を使用) を使用して、ニュース記事を自動取得するかどうかを指定します。  
   <br>
   Cronを使用して本ソフトウェアをワンショットで実行する場合は、この値を<code>false</code>に指定します。  
-  したがって、<code>false</code>に指定する場合、本ソフトウェアをワンショットで実行して、ニュース記事を1度だけ自動取得することができます。  
+  つまり、<code>false</code>に指定する場合、本ソフトウェアをワンショットで実行して、ニュース記事を1度だけ自動取得することができます。  
   例えば、Systemdサービスを使用できない環境等で使用します。  
   <br>
 * maxpara  

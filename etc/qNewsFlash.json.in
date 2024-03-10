@@ -1,7 +1,7 @@
 {
     "api": "",
     "asahi": false,
-    "autofetch": false,
+    "autofetch": true,
     "bbs": "",
     "cnet": true,
     "exclude": [
