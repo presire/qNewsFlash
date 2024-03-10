@@ -163,7 +163,7 @@ void Runner::run()
         m_timer.start(static_cast<int>(m_interval));
     }
 
-    // アプリケーション開始直後にRSSを読み込む場合は、コメントを解除して、fetchRssFeed()メソッドを実行する
+    // 本ソフトウェア開始直後にRSSを読み込む場合は、コメントを解除して、fetch()メソッドを実行する
     // コメントアウトしている場合、最初にRSSを読み込むタイミングは、タイマの指定時間後となる
     fetch();
 
@@ -1842,25 +1842,73 @@ int Runner::deleteLogNotToday()
     // ログファイルをクローズ
     File.close();
 
-    // ログファイルから昨日以前(昨日も含む)の日付の書き込み済みニュース記事を削除
+    // 公開日が2日以上前の書き込み済みニュース記事をログファイルから削除
     QJsonDocument doc(QJsonDocument::fromJson(data));
     QJsonArray array = doc.array();
 
-    /// 日本のタイムゾーンを設定して、今日の日付を取得
-    auto now = QDateTime::currentDateTimeUtc().toTimeZone(QTimeZone("Asia/Tokyo"));
-    auto currentDate = now.date().toString("yyyy年M月d日");
-
+    /// 保存する書き込み済み記事
     QJsonArray newLogArray = {};
+
+    /// 日本のタイムゾーンを設定して、今日の日付を取得
+    QTimeZone timeZone("Asia/Tokyo");
+    QDate currentDate = QDate::currentDate();
+
     for (auto && i : array) {
         auto obj = i.toObject();
 
-        // " h時m分"を除去
-        auto dateString = obj["date"].toString().split(" ")[0];
+        /// " h時m分"の部分を除去
+        auto pubDateString = obj["date"].toString().split(" ")[0];
+        auto pubDate = QDate::fromString(pubDateString, "yyyy年M月d日");
 
-        if (dateString.compare(currentDate) == 0) {
+        // 現在の日付と公開日の日付の差
+        int daysDiff = pubDate.daysTo(currentDate);
+
+        // ニュース記事の公開日が前日までの場合は残す
+        if (daysDiff >= 0 && daysDiff <= 1) {
             newLogArray.append(obj);
         }
     }
+
+//    if (m_WithinHours == 0) {
+//        /// 昨日以前のニュース記事を削除
+//        /// 日本のタイムゾーンを設定して、今日の日付を取得
+//        auto now = QDateTime::currentDateTimeUtc().toTimeZone(QTimeZone("Asia/Tokyo"));
+//        auto currentDate = now.date().toString("yyyy年M月d日");
+
+//        for (auto && i : array) {
+//            auto obj = i.toObject();
+
+//            /// " h時m分"の部分を除去
+//            auto dateString = obj["date"].toString().split(" ")[0];
+
+//            if (dateString.compare(currentDate) == 0) {
+//                newLogArray.append(obj);
+//            }
+//        }
+//    }
+//    else if (0 < m_WithinHours) {
+//        /// qNewsFlash.jsonの"withinhours"キーに指定した時間以前のニュース記事を削除
+//        /// 日本のタイムゾーンを設定して、現在の日時を取得
+//        auto currentTime = QDateTime::currentDateTime().toTimeZone(QTimeZone("Asia/Tokyo"));
+
+//        /// 現在時刻からm_WithinHours時間前の時刻を計算
+//        QDateTime beforeTime = currentTime.addSecs(- m_WithinHours * 60 * 60);
+
+//        for (auto && i : array) {
+//            auto obj = i.toObject();
+
+//            /// ログファイルから各記事の公開日を取得
+//            auto articleTime = obj["date"].toString();
+
+//            /// 取得した各記事の公開日の日時形式を変換
+//            QDateTime dataTime = QDateTime::fromString(articleTime, "yyyy年M月d日 H時m分");
+
+//            /// m_WithinHours時間内の場合は保存
+//            if (dataTime >= beforeTime && dataTime <= currentTime) {
+//                newLogArray.append(obj);
+//            }
+//        }
+//    }
 
     // ログファイルを再度開いて内容を変更
     QJsonDocument saveDoc(newLogArray);
@@ -1930,7 +1978,7 @@ int Runner::getDatafromWrittenLog()
 }
 
 
-// [q]キーまたは[Q]キー ==> [Enter]キーを押下した場合、メインループを抜けてアプリケーションを終了する
+// [q]キーまたは[Q]キー ==> [Enter]キーを押下した場合、メインループを抜けて本ソフトウェアを終了する
 void Runner::onReadyRead()
 {
     // 標準入力から1行のみ読み込む

@@ -19,11 +19,12 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 
 <br>
 
-**このソフトウェアを動作させるには、Qt 5.15以降 (Core、Network) および libxml 2.0が必要となります。**  
+**このソフトウェアを動作させるには、Qt 5.15 (Core、Network) および libxml 2.0が必要となります。**  
+**Qt 6を使用してビルドおよび動作させることができる可能性もありますが、確認はしておりませんのでご注意ください。**  
 <br>
 
-この記事では、Red Hat Enterprise LinuxおよびSUSE Linux Enterprise / openSUSEを前提に記載しております。  
-また、他のLinuxディストリビューションにもインストールして使用できると思います。  
+README.mdでは、Red Hat Enterprise LinuxおよびSUSE Linux Enterprise / openSUSEを前提に記載しております。  
+また、他のLinuxディストリビューションにもインストールして使用できると思います。(Raspberry Pi上での動作は確認済みです)  
 (例: Linux Mint, Manjaro, MX Linux, ... 等)  
 <br>
 
@@ -56,7 +57,7 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 <br>
 
 
-システムをアップデートした後、続いてビルドに必要なライブラリをインストールします。  
+システムをアップデートした後、続いて本ソフトウェアのビルドに必要なライブラリをインストールします。  
 
     # Red Hat Enterprise Linux
     sudo dnf update   
@@ -200,8 +201,7 @@ Systemdサービスを使用せずに、qNewsFlashを実行することもでき
 
 qnewsflash.serviceファイルを開いて、<code>[Service]</code>セクションの<code>Type</code>キーの値を、<code>oneshot</code>に変更します。  
 
-併せて、<code>ExecStop</code>キーの行をコメントアウトして、  
-<code>Restart</code>キーの値を<code>no</code>に設定します。  
+併せて、<code>ExecStop</code>キーの行をコメントアウトして、<code>Restart</code>キーの値を<code>no</code>に設定します。  
 
 以下のSystemdサービスファイルの設定例をご参照ください。  
 <br>
@@ -246,7 +246,7 @@ qNewsFlash.shファイルの内容を以下に示します。
     cd $dirname
 
     # Qt 5ライブラリのパスを環境変数LD_LIBRARY_PATHに追加
-    export LD_LIBRARY_PATH="/<qNewsFlashのインストールディレクトリ>/<lib または lib64>/Qt:$LD_LIBRARY_PATH"
+    export LD_LIBRARY_PATH="/<qNewsFlashのインストールディレクトリ>/<lib | lib64>/Qt:$LD_LIBRARY_PATH"
 
     # qNewsFlashの実行
     "$dirname/$appname" "$@" 
@@ -268,7 +268,7 @@ qNewsFlashが正常に実行できるかどうかを確認してください。
 Systemdサービスを使用する場合は、<I>**ExecStart**</I> キーの値も変更します。  
 
 
-<code>ExecStart=/< qNewsFlashのインストールディレクトリ >/bin/qNewsFlash.sh --sysconf=<qNewsFlash.jsonのパス></code>
+<code>ExecStart=/<qNewsFlashのインストールディレクトリ>/bin/qNewsFlash.sh --sysconf=<qNewsFlash.jsonのパス></code>
 
 <br>
 <br>
@@ -289,8 +289,8 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
 * newsapi  
   デフォルト値 : <code>false</code>  
   News APIからニュースを取得するかどうかを指定します。  
-  無料版のNews APIは、ニュース記事が1日遅れのため、デフォルトは無効です。  
-  なお、有料版のNews APIビジネスにおいて、月額$449となっております。  
+  無料版のNews APIは、ニュース記事が1日遅れのため、デフォルトでは無効です。  
+  なお、有料版のNews APIビジネスについては、月額$449となっております。  
   <br>
 * api  
   デフォルト値 : 空欄  
@@ -313,8 +313,8 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   <br>
 * asahi  
   デフォルト値 : <code>false</code>  
-  朝日デジタルからニュースを取得するかどうかを指定します。  
-  デフォルトは無効です。  
+  朝日新聞デジタルからニュースを取得するかどうかを指定します。  
+  RSSから取得できる朝日新聞デジタルの記事は有料記事が多いため、デフォルトは無効です。  
   <br>
 * cnet  
   デフォルト値 : <code>true</code>  
@@ -332,17 +332,17 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   <br>
   Cronを使用して本ソフトウェアをワンショットで実行する場合は、この値を<code>false</code>に指定します。  
   つまり、<code>false</code>に指定する場合、本ソフトウェアをワンショットで実行して、ニュース記事を1度だけ自動取得することができます。  
-  例えば、Systemdサービスを使用できない環境等で使用します。  
+  例えば、Systemdサービスが使用できない環境 (Cronのみが使用できる環境) 等で使用します。  
   <br>
 * maxpara  
-  デフォルト値 : <code>100</code>  
+  デフォルト値 : <code>"100"</code>  
   各ニュース記事の本文の最大文字数を指定します。  
   <code>0</code>を指定する場合、本文は非表示となります。  
   <br>
   デフォルトは最大100文字です。  
   <br>
 * interval  
-  デフォルト値 : <code>1800</code>  
+  デフォルト値 : <code>"1800"</code>  
   各ニュースサイトからニュース記事を取得する時間間隔 (秒) を指定します。  
   デフォルト値は1800[秒] (30分間隔でニュース記事を取得) です。  
   <br>
@@ -353,25 +353,25 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   <u>その場合、大きめの数値を指定したほうがよい可能性があります。</u>  
   <br>
 * withinhours  
-  デフォルト値 : <code>0</code> (無効)  
+  デフォルト値 : <code>"0"</code> (無効)  
   <br>
   例えば、公開日が3時間前以内のニュース記事を取得する場合、設定ファイル qNewsFlash.jsonの<code>withinhours</code>キーの値を<code>"3"</code>に指定します。  
   なお、<code>withinhours</code>キーに指定できる値は、<code>"0"</code>から<code>"24"</code>までです。  
-  <code>"0"</code>、<code>"25"</code>以上の値、その他の値を指定する場合はこの機能は無効になります。  
+  <code>"0"</code>、<code>"25"</code>以上の値、その他の値を指定した場合はこの機能は無効となります。  
   <br>
 * <del>writefile</del> <u>**(version 0.1.0以降は無効)**</u>  
-  デフォルト値 : <code>/tmp/qNewsFlashWrite.json</code>  
+  デフォルト値 : <code>"/tmp/qNewsFlashWrite.json"</code>  
   このソフトウェアは、各ニュースサイトからニュース記事群からニュース記事を自動的に1つ選択します。  
   このファイルは、その選択された1つのニュース記事の情報が記載されています。  
   <br>
   このファイルを利用して、ユーザは掲示板等に自動的に書き込むようなスクリプトを作成することができます。  
   <br>
 * logfile  
-  デフォルト値 : <code>/var/log/qNewsFlash_log.json</code>  
+  デフォルト値 : <code>"/var/log/qNewsFlash_log.json"</code>  
   上記のニュース記事が自動的に1つ選択された時、選択された各記事のログを保存しています。  
-  ただし、当日に選択された記事のみを保存しているため、前日のログは自動的に削除されます。  
+  ただし、当日に選択された記事のみを保存しているため、2日以上前のログは自動的に削除されます。  
   <br>
-  前日の記事が削除されるタイミングは、日付が変わった時の最初の更新時です。  
+  なお、2日以上前の記事が削除されるタイミングは、日付が変わった時の最初の更新時です。  
   <br>
 * update  
   デフォルト値 : 空欄  
@@ -470,7 +470,7 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
 
 # 5 <del>書き込み用の記事ファイル - qNewsFlashWrite.jsonファイル</del>  
 
-**この設定ファイルは現在使用されておりません**  
+**この設定ファイルは、qNewsFlash 0.1.0以降 使用されておりませんのでご注意ください**  
 
 上記のセクションでも記載した通り、  
 このソフトウェアは、各ニュースサイトからニュース記事を複数取得して、その複数のニュース記事から自動的に1つのみを選択します。  
@@ -499,12 +499,12 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
 
 # 6. ログファイル - qNewsFlash_log.json
 
-上記のセクションでも記載した通り、  
-ニュース記事が自動的に1つ選択された時、選択された各記事のログを保存しています。  
-ただし、当日に選択された記事のみを保存しているため、前日のログは自動的に削除されます。  
+上記のセクションにも記載した通り、  
+ニュース記事が自動的に1つ書き込みされた時、書き込まれた各記事のログを保存しています。  
+ただし、当日および前日に書き込みされたニュース記事のみを保存しているため、2日以上前のログは自動的に削除されます。  
 <br>
 
-前日の記事が削除されるタイミングは、日付が変わった時の最初の更新時です。  
+2日以上前の記事が削除されるタイミングは、日付が変わった時の最初の更新時です。  
 <br>
 
 また、設定ファイルにより、このファイル名およびパスを自由に変更することができます。  
