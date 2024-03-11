@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(qNewsFlash VERSION 0.1.4 LANGUAGES CXX)
+project(qNewsFlash VERSION 0.1.5 LANGUAGES CXX)
 
 
 # Linuxのみビルドを許可
@@ -106,15 +106,15 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch
     if(COMPILER_SUPPORTS_NEON)
         target_compile_definitions(qNewsFlash PRIVATE ARM_NEON)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon")
-    endif()
-
-    # WMMXをサポートする場合 (主に32ビットARM)
-    # WMMXのサポートは、特定のコンパイラやプラットフォームに依存する可能性があるため、
-    # 実際にコンパイラがWMMXをサポートしているかどうかを確認する必要がある
-    CHECK_CXX_COMPILER_FLAG("-march=armv7-a+simd" COMPILER_SUPPORTS_WMMX)
-    if(COMPILER_SUPPORTS_WMMX)
-        target_compile_definitions(qNewsFlash PRIVATE ARM_WMMX)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv7-a+simd")
+    else()
+        # WMMXをサポートする場合 (主に32ビットARM)
+        # WMMXのサポートは、特定のコンパイラやプラットフォームに依存する可能性があるため、
+        # 実際にコンパイラがWMMXをサポートしているかどうかを確認する必要がある
+        CHECK_CXX_COMPILER_FLAG("-march=armv7-a+simd" COMPILER_SUPPORTS_WMMX)
+        if(COMPILER_SUPPORTS_WMMX)
+            target_compile_definitions(qNewsFlash PRIVATE ARM_WMMX)
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv7-a+simd")
+        endif()
     endif()
 endif()
 

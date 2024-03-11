@@ -5,6 +5,7 @@ After=NetworkManager.service systemd-resolved.service
 
 [Service]
 Type=simple
+ExecStartPre=/bin/sleep 30
 ExecStart=@CMAKE_INSTALL_PREFIX@/bin/qNewsFlash --sysconf=@SYSCONF_DIR@/qNewsFlash.json
 ExecReload=/bin/kill -HUP  $MAINPID
 ExecStop=/bin/kill   -TERM $MAINPID

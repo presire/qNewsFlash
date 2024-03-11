@@ -181,6 +181,10 @@ qNewsFlashを停止する場合は、以下に示すコマンドを実行しま�
     systemctl --user stop qnewsflash.service
 <br>
 
+**デフォルトでは、PCの起動直後から30[秒]待機した後、本ソフトウェアを遅延起動しています。**  
+**もし十分なリソースをもつPCの場合は、この設定を変更しても正常に動作すると予想されます。**  
+<br>
+
 ## 2.3. 直接実行する
 
 Systemdサービスを使用せずに、qNewsFlashを実行することもできます。  
@@ -210,6 +214,7 @@ qnewsflash.serviceファイルを開いて、<code>[Service]</code>セクショ�
 **Systemdサービスの設定例**  
   [Service]  
   Type=oneshot  
+  ExecStartPre=/bin/sleep 30
   ExecStart=/<qNewsFlashのインストールディレクトリ>/bin/qNewsFlash --sysconf=<qNewsFlash.jsonのパス>  
   ExecReload=/bin/kill -HUP  $MAINPID  
   #ExecStop=/bin/kill   -TERM $MAINPID  

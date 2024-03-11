@@ -116,7 +116,7 @@ void Runner::run()
         return;
     }
 
-    // ログファイルから、本日の書き込み済みのニュース記事を取得
+    // ログファイルから、今日と昨日の書き込み済みのニュース記事を取得
     // また、取得した記事群のデータは、メンバ変数m_WrittenArticlesに保存
     if (getDatafromWrittenLog()) {
         QCoreApplication::exit();
@@ -195,11 +195,18 @@ void Runner::fetch()
         /// 日付が変わっている場合
         m_LastUpdate = date;
 
-        /// 書き込み済みの昨日の記事群を削除
+        /// メンバ変数m_WrittenArticlesから、書き込み済みの2日以上前の記事群を削除
         m_WrittenArticles.clear();
 
-        /// ログ情報を保存するファイルから、昨日以前(昨日も含む)の書き込み済みのニュース記事を削除
+        /// ログファイルから、2日以上前の書き込み済みニュース記事を削除
         if (deleteLogNotToday()) {
+            QCoreApplication::exit();
+            return;
+        }
+
+        /// ログファイルから、今日と昨日の書き込み済みのニュース記事を取得
+        /// また、取得した記事群のデータはメンバ変数m_WrittenArticlesに格納
+        if (getDatafromWrittenLog()) {
             QCoreApplication::exit();
             return;
         }
