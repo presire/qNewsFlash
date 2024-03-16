@@ -9,7 +9,8 @@ int main(int argc, char *argv[])
     QCoreApplication app(argc, argv);
 
 #ifdef Q_OS_LINUX
-    QString RunUser = "";
+
+    QString  RunUser = "";
     QProcess Proc;
     QObject::connect(&Proc, static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
                      [&Proc, &RunUser]([[maybe_unused]] int exitCode, [[maybe_unused]] QProcess::ExitStatus exitStatus) {
@@ -22,10 +23,13 @@ int main(int argc, char *argv[])
     // ランナー開始
     Runner runner(QCoreApplication::arguments(), RunUser);
     QTimer::singleShot(0, &runner, &Runner::run);
+
 #elif Q_OS_WIN
+
     // ランナー開始
     Runner runner(QCoreApplication::arguments());
     QTimer::singleShot(0, &runner, &Runner::run);
+
 #endif
 
     return app.exec();

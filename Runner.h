@@ -1,10 +1,12 @@
 #ifndef RUNNER_H
 #define RUNNER_H
 
+#include <QThread>
 #include <QObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QTimer>
+#include <QtConcurrent>
 
 #ifdef Q_OS_LINUX
     #include <QSocketNotifier>
@@ -19,6 +21,7 @@
 #include <memory>
 #include "Article.h"
 #include "Poster.h"
+#include "EarthQuake.h"
 
 
 class Runner : public QObject
@@ -26,10 +29,22 @@ class Runner : public QObject
     Q_OBJECT
 
 private:  // Variables
+    // 共通
     QStringList                             m_args;         // コマンドラインオプション
     QString                                 m_User;         // このソフトウェアを実行しているユーザ名
     QString                                 m_SysConfFile;  // このソフトウェアの設定ファイルのパス
-    bool                                    m_AutoFetch;    // メンバ変数m_intervalの値を使用して自動的にニュース記事を取得するかどうか
+
+#ifdef Q_OS_LINUX
+    std::unique_ptr<QSocketNotifier>        m_pNotifier;    // このソフトウェアを終了するためのキーボードシーケンスオブジェクト
+#elif Q_OS_WIN
+    std::unique_ptrQWinEventNotifier>       m_pNotifier;    // このソフトウェアを終了するためのキーボードシーケンスオブジェクト
+#endif
+
+    std::atomic<bool>                       m_stopRequested;
+
+    // ニュース記事の情報
+    bool                                    m_AutoFetch;    // ワンショット機能の有効 / 無効
+                                                            // メンバ変数m_intervalの値を使用して自動的にニュース記事を取得するかどうか
 
 #ifdef _BELOW_0_1_0
     QString                                 m_WriteFile;    // スレッド書き込み用のJSONファイルのパス
@@ -38,7 +53,7 @@ private:  // Variables
     QString                                 m_LogFile;      // スレッド書き込み済みのJSONファイルのパス
                                                             // qNewsFlash.jsonファイルに設定を記述する
                                                             // デフォルト : /var/log/qNewsFlash_log.json
-    QTimer                                  m_timer;        // インターバル時間をトリガとするタイマ
+    QTimer                                  m_timer;        // ニュース記事を取得するためのインターバル時間をトリガとするタイマ
     unsigned long long                      m_interval;     // ニュース記事を取得する時間間隔
     bool                                    m_bNewsAPI;     // News APIからニュース記事を取得するかどうか
     bool                                    m_bJiJi;        // 時事ドットコムからニュース記事を取得するかどうか
@@ -52,6 +67,8 @@ private:  // Variables
     long long                               m_MaxParagraph; // 本文の一部を抜粋する場合の最大文字数
     int                                     m_WithinHours;  // 公開日がn時間前以内のニュース記事を取得する
     QString                                 m_LastUpdate;   // 最後にニュース記事群を取得した日付 (フォーマット : yyyy/M/d)
+    bool                                    m_changeTitle;  // スレッドのタイトルを変更するかどうか
+                                                            // 防弾嫌儲およびニュース速報(Libre)等のスレッドのタイトルが変更できる掲示板で使用可能
     std::unique_ptr<QNetworkAccessManager>  manager;        // ニュース記事を取得するためのネットワークオブジェクト
     QNetworkReply                           *m_pReply;      // News API用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyJiJi;  // 時事ドットコム用HTTPレスポンスのオブジェクト
@@ -65,19 +82,21 @@ private:  // Variables
     QString                                 m_RequestURL;   // 記事を書き込むためのPOSTデータを送信するURL
     THREAD_INFO                             m_ThreadInfo;   // 記事を書き込むスレッドの情報
 
-#ifdef Q_OS_LINUX
-    std::unique_ptr<QSocketNotifier>        m_pNotifier;    // このソフトウェアを終了するためのキーボードシーケンスオブジェクト
-#elif Q_OS_WIN
-    std::unique_ptrQWinEventNotifier>       m_pNotifier;    // このソフトウェアを終了するためのキーボードシーケンスオブジェクト
-#endif
-
-    std::atomic<bool>                       m_stopRequested;
+    // 地震の情報
+    bool                                    m_bEQAlert,     // 緊急地震速報(警報)の有効 / 無効
+                                            m_bEQInfo;      // 発生した地震情報の有効 / 無効
+    int                                     m_Scale,        // 震度の閾値 (この震度以上の場合はスレッドを立てる)
+                                            m_EQInterval;   // 地震の情報を取得する時間間隔 (デフォルト : 10[秒]〜)
+    QString                                 m_AlertFile,    // 緊急地震速報(警報)のIDを保存するファイルパス
+                                            m_InfoFile;     // 発生した地震情報のIDを保存するファイルパス
+    QTimer                                  m_EQTimer;      // 地震の情報を取得するためのインターバル時間をトリガとするタイマ
+    std::unique_ptr<EarthQuake>             m_pEarthQuake;  // 地震情報クラスを管理するオブジェクト
 
 public:  // Variables
 
 private:  // Methods
     int         getConfiguration(QString &filepath);        // このソフトウェアの設定ファイルの情報を取得
-    void        GetOption();                                // コマンドラインオプションの取得 (現在は未使用)
+    [[maybe_unused]] void        GetOption();               // コマンドラインオプションの取得 (現在は未使用)
 
 #ifdef _BELOW_0_1_0
     int         setLogFile();                               // このソフトウェアのログ情報を保存するファイルのパスを設定
@@ -142,6 +161,9 @@ public slots:
     void fetchHanJRSS();    // ハンギョレジャパンからニュース記事の取得後に実行するスロット
     void fetchReutersRSS(); // ロイター通信からニュース記事の取得後に実行するスロット
     void onReadyRead();     // ノンブロッキングでキー入力を受信するスロット
+
+    // 地震情報
+    void getEarthQuake();   // 緊急地震速報(警報)および発生した地震情報を取得する割り込みスロット
 };
 
 #endif // RUNNER_H

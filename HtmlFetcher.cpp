@@ -59,7 +59,6 @@ int HtmlFetcher::fetchParagraph(QNetworkReply *reply, const QString& _xpath)
     }
 
     // XPathで特定の要素を検索
-    //xmlChar *xpath = (xmlChar*) "//head/meta[@name='description']/@content";
     auto *xpath = xmlStrdup((const xmlChar*)_xpath.toUtf8().constData());
     xmlXPathObjectPtr result = getNodeset(doc, xpath);
     if (result == nullptr) {
@@ -92,7 +91,7 @@ int HtmlFetcher::fetchParagraph(QNetworkReply *reply, const QString& _xpath)
     }
 
     // 本文が指定文字数以上の場合、指定文字数分のみを抽出
-    m_Paragraph = content.size() > m_MaxParagraph ? m_Paragraph = content.mid(0, static_cast<int>(m_MaxParagraph)) : content;
+    m_Paragraph = content.size() > m_MaxParagraph ? m_Paragraph = content.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : content;
 
     xmlXPathFreeObject(result);
     xmlFreeDoc(doc);

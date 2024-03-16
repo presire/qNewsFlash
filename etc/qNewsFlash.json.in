@@ -3,7 +3,16 @@
     "asahi": false,
     "autofetch": true,
     "bbs": "",
+    "chtt": false,
     "cnet": true,
+    "earthquake": {
+        "alert": false,
+        "alertlog": "/tmp/eqalert.log",
+        "info": false,
+        "infolog": "/tmp/eqinfo.log",
+        "interval": 10,
+        "scale": 50
+    },
     "exclude": [
         "Kbc.co.jp",
         "Sponichi.co.jp",

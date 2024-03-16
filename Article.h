@@ -16,15 +16,14 @@ private:
     QString m_Date;
 
 public:
-    // デフォルトコンストラクタ
     Article() = default;
     explicit Article(QObject *parent = nullptr);
     Article(const Article &obj, QObject *parent = nullptr) noexcept;
     Article(QString, QString, QString, QString, QObject *parent = nullptr);
-    virtual  ~Article();
+     ~Article() override;
 
     Article& operator=(const Article &other);  // 代入演算子のオーバーロード
-    std::tuple<QString, QString, QString, QString> getArticleData() const;
+    [[nodiscard]] std::tuple<QString, QString, QString, QString> getArticleData() const;
 
 signals:
 

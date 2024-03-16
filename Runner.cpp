@@ -13,6 +13,7 @@
 #include <iostream>
 #include <random>
 #include <utility>
+#include <set>
 #include "Runner.h"
 #include "HtmlFetcher.h"
 #include "RandomGenerator.h"
@@ -25,7 +26,8 @@ Runner::Runner(QStringList _args, QString user, QObject *parent) : m_args(std::m
     QObject{parent}
 {
     connect(&m_timer, &QTimer::timeout, this, &Runner::fetch);
-    connect(m_pNotifier.get(), &QSocketNotifier::activated, this, &Runner::onReadyRead);  // キーボードシーケンスの有効化
+    //connect(&m_EQTimer, &QTimer::timeout, this, &Runner::getEarthQuake);
+    connect(m_pNotifier.get(), &QSocketNotifier::activated, this, &Runner::onReadyRead);        // キーボードシーケンスの有効化
 }
 #elif Q_OS_WIN
 Runner::Runner(QStringList _args, QObject *parent) : m_args(std::move(_args)), m_SysConfFile(""), m_interval(30 * 60 * 1000),
@@ -34,7 +36,8 @@ Runner::Runner(QStringList _args, QObject *parent) : m_args(std::move(_args)), m
     QObject{parent}
 {
     connect(&m_timer, &QTimer::timeout, this, &Runner::fetch);
-    connect(m_pNotifier.get(), &QWinEventNotifier::activated, this, &Runner::onReadyRead);  // キーボードシーケンスの有効化
+    //connect(&m_EQTimer, &QTimer::timeout, this, &Runner::getEarthQuake);
+    connect(m_pNotifier.get(), &QWinEventNotifier::activated, this, &Runner::onReadyRead);      // キーボードシーケンスの有効化
 }
 #endif
 
@@ -68,7 +71,7 @@ void Runner::run()
 
             break;
         }
-        else if (m_args.length() == 1 && (arg.compare("--version", Qt::CaseInsensitive) == 0 || arg.compare("-v", Qt::CaseSensitive) == 0) ) {
+        else if (m_args.length() == 1 && (arg.compare("--version", Qt::CaseSensitive) == 0 || arg.compare("-v", Qt::CaseInsensitive) == 0) ) {
             // バージョン情報
             auto version = QString("qNewsFlash %1.%2.%3\n").arg(PROJECT_VERSION_MAJOR).arg(PROJECT_VERSION_MINOR).arg(PROJECT_VERSION_PATCH)
                            + QString("ライセンス : UNLICENSE\n")
@@ -79,7 +82,7 @@ void Runner::run()
             QCoreApplication::exit();
             return;
         }
-        else if (m_args.length() == 1 && (arg.compare("--help", Qt::CaseInsensitive) == 0 || arg.compare("-h", Qt::CaseInsensitive) == 0) ) {
+        else if (m_args.length() == 1 && (arg.compare("--help", Qt::CaseSensitive) == 0 || arg.compare("-h", Qt::CaseSensitive) == 0) ) {
             // ヘルプ
             auto help = QString("使用法 : qNewsFlash [オプション]\n\n")
                            + QString("  --sysconf=<qNewsFlash.jsonファイルのパス>\t\t設定ファイルのパスを指定する\n")
@@ -163,12 +166,19 @@ void Runner::run()
         m_timer.start(static_cast<int>(m_interval));
     }
 
+    // 緊急地震速報(警報)および発生した地震情報を取得するかどうかを確認
+    // いずれかが有効の場合、かつ、ワンショット機能が無効の場合は、緊急地震速報(警報)および発生した地震情報のタイマ割り込みを有効化
+    if ((m_bEQAlert || m_bEQInfo) && m_AutoFetch) {
+        connect(&m_EQTimer, &QTimer::timeout, this, &Runner::getEarthQuake);
+        m_EQTimer.start(m_EQInterval);
+    }
+
     // 本ソフトウェア開始直後にRSSを読み込む場合は、コメントを解除して、fetch()メソッドを実行する
     // コメントアウトしている場合、最初にRSSを読み込むタイミングは、タイマの指定時間後となる
     fetch();
 
     // ソフトウェアの自動起動が無効の場合
-    // Cronを使用する場合、または、ワンショットで動作させる場合に使用
+    // Cronを使用する場合、または、ワンショットで動作させる場合の処理
     if (!m_AutoFetch) {
         // 既に[q]キーまたは[Q]キーが押下されている場合は再度終了処理を行わない
         if (!m_stopRequested.load()) {
@@ -407,8 +417,12 @@ void Runner::fetch()
         // ニュース記事のタイトル --> 公開日 --> 本文の一部 --> URL の順に並べて書き込む
         // ただし、ニュース記事の本文を取得しない場合は、ニュース記事のタイトル --> 公開日 --> URL の順とする
         auto [title, paragraph, link, pubDate] = article.getArticleData();
+
+        // スレッドのタイトルを変更するかどうか (防弾嫌儲およびニュース速報(Libre)等の掲示板で使用可能)
+        title = m_changeTitle ? QString("!chtt") + title : title;
+
         m_ThreadInfo.message = QString("%1%2%3%4").arg(QString(title + "\n"),
-                                                       QString(pubDate + "\n"),
+                                                       QString(pubDate + "\n\n"),
                                                        QString(paragraph.length() == 0 ? "" : QString(paragraph + "\n")),
                                                        QString(link + "\n"));
 
@@ -421,7 +435,7 @@ void Runner::fetch()
         }
 
         // POSTデータの送信
-        if (poster.Post(QUrl(m_RequestURL), m_ThreadInfo)) {
+        if (poster.PostforWriteThread(QUrl(m_RequestURL), m_ThreadInfo)) {
             // スレッドへの書き込みに失敗した場合
             return;
         }
@@ -437,7 +451,7 @@ void Runner::fetch()
 #endif
 
         // 書き込み済みの記事を履歴として登録 (同じ記事を1日に2回以上書き込まないようにする)
-        // ただし、1日過ぎた場合は書き込み済み記事の履歴を削除する
+        // ただし、2日前以上の書き込み済み記事の履歴は削除する
         m_WrittenArticles.append(article);
 
         // ログファイルに書き込む
@@ -509,9 +523,9 @@ void Runner::fetchNewsAPI()
             }
             if (bWritten) continue;
 
-            // 本文が100文字以上の場合、先頭100文字のみを抽出
+            // 本文が指定文字数以上の場合、指定文字数のみを抽出
             auto paragraph = article["description"].toString();
-            paragraph = paragraph.length() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) : paragraph;
+            paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
 
             // 書き込む前の記事群
             Article articleObj(article["title"].toString(), paragraph, article["url"].toString(), convDate);
@@ -519,7 +533,7 @@ void Runner::fetchNewsAPI()
 
 #ifdef _DEBUG
             qDebug() << "Title : " << article["title"].toString();
-            qDebug() << "Paragraph : " << article["description"].toString();
+            qDebug() << "Paragraph : " << paragraph;
             qDebug() << "URL : " << article["url"].toString();
             qDebug() << "Date : " << convDate;
             qDebug() << "";
@@ -732,7 +746,7 @@ void Runner::itemTagsforKyodo(xmlNode *a_node)
                         paragraph.replace("&#8230;", "");
 
                         // 本文が指定文字数以上の場合、指定文字数分のみを抽出
-                        paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) : paragraph;
+                        paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
                         link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
@@ -986,7 +1000,7 @@ void Runner::itemTagsforCNet(xmlNode *a_node)
                         paragraph = paragraph.replace(re3, "").replace(" ", "").replace("\u3000", "");
 
                         // 本文が指定文字数以上の場合、指定文字数分のみを抽出
-                        paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) : paragraph;
+                        paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
                         link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
@@ -1083,9 +1097,9 @@ void Runner::itemTagsforHanJ(xmlNode *a_node)
         if (cur_node->type == XML_ELEMENT_NODE && xmlStrcmp(cur_node->name, BAD_CAST "item") == 0) {
             xmlNode *itemChild = cur_node->children;
             QString title       = "",
-                paragraph   = "",
-                link        = "",
-                date        = "";
+                    paragraph   = "",
+                    link        = "",
+                    date        = "";
             bool    bSkipNews   = false;
 
             while (itemChild) {
@@ -1107,6 +1121,9 @@ void Runner::itemTagsforHanJ(xmlNode *a_node)
                         // 不要な文字を削除 (半角 / 全角スペース等)
                         static QRegularExpression re3("[\\s]", QRegularExpression::CaseInsensitiveOption);
                         paragraph = paragraph.replace(re3, "").replace(" ", "").replace("\u3000", "");
+
+                        // 本文が指定文字数以上の場合、指定文字数分のみを抽出
+                        paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
                         link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
@@ -1610,6 +1627,88 @@ int Runner::getConfiguration(QString &filepath)
             m_LastUpdate = update;
         }
 
+        // スレッドのタイトルを変更するかどうか
+        // この機能は、防弾嫌儲およびニュース速報(Libre)等のスレッドのタイトルが変更できる掲示板で使用可能
+        m_changeTitle    = JsonObject["chtt"].toBool(false);
+
+        // 緊急地震速報(警報)および発生した地震情報を取得するかどうか
+        QJsonObject earthquakeObj = JsonObject.value("earthquake").toObject();
+
+        m_bEQAlert = earthquakeObj.value("alert").toBool(false);
+        if (m_bEQAlert) {
+            /// 読み書き権限の確認
+            m_AlertFile = earthquakeObj.value("alertlog").toString("/tmp/eqalert.log");
+            if (m_AlertFile.isEmpty()) {
+                m_AlertFile = QString("/tmp/eqalert.log");
+            }
+
+            /// 書き込み済み(ログ用)のJSONファイルが存在しない場合は空のログファイルを作成
+            QFile EQAlertFile(m_AlertFile);
+            if (!EQAlertFile.exists()) {
+                std::cout << QString("緊急地震速報(警報)のログファイルが存在しないため作成します %1").arg(m_AlertFile).toStdString() << std::endl;
+
+                if (EQAlertFile.open(QIODevice::WriteOnly)) {
+                    EQAlertFile.close();
+                }
+                else {
+                    std::cerr << QString("エラー : 緊急地震速報(警報)のログファイルの作成に失敗 %1").arg(EQAlertFile.errorString()).toStdString() << std::endl;
+                    return -1;
+                }
+            }
+            else {
+                QFileInfo EQFileInfo(m_AlertFile);
+                if (!EQFileInfo.permission(QFile::ReadUser |QFile::WriteUser)) return -1;
+            }
+        }
+
+        m_bEQInfo = earthquakeObj.value("info").toBool(false);
+        if (m_bEQInfo) {
+            /// 読み書き権限の確認
+            m_InfoFile = earthquakeObj.value("infolog").toString("/tmp/eqinfo.log");
+            if (m_InfoFile.isEmpty()) {
+                m_InfoFile = QString("/tmp/eqinfo.log");
+            }
+
+            /// 書き込み済み(ログ用)のJSONファイルが存在しない場合は空のログファイルを作成
+            QFile EQInfoFile(m_InfoFile);
+            if (!EQInfoFile.exists()) {
+                std::cout << QString("発生した地震情報のログファイルが存在しないため作成します %1").arg(m_InfoFile).toStdString() << std::endl;
+
+                if (EQInfoFile.open(QIODevice::WriteOnly)) {
+                    EQInfoFile.close();
+                }
+                else {
+                    std::cerr << QString("エラー : 発生した地震情報のログファイルの作成に失敗 %1").arg(EQInfoFile.errorString()).toStdString() << std::endl;
+                    return -1;
+                }
+            }
+            else {
+                QFileInfo EQFileInfo(m_InfoFile);
+                if (!EQFileInfo.permission(QFile::ReadUser |QFile::WriteUser)) return -1;
+            }
+        }
+
+        /// 地震情報の取得の時間間隔が10秒未満、または、30秒以上の場合は、強制的に10秒に設定
+        m_EQInterval = earthquakeObj.value("interval").toInt(10);
+        if (m_EQInterval < 10 || m_EQInterval > 60) {
+            std::cout << QString("地震情報の取得間隔が不正です 設定値 : %1").arg(m_EQInterval).toStdString() << std::endl;
+            std::cout << QString("強制的に10[秒]に設定されます").toStdString() << std::endl;
+
+            m_EQInterval = 10;
+        }
+        m_EQInterval *= 1000;
+
+        /// 震度の閾値
+        const std::set<int> allowedScale = {10, 20, 30, 40, 45, 50, 55, 60, 70};
+
+        m_Scale = earthquakeObj.value("scale").toInt(50);       
+        if (allowedScale.find(m_Scale) == allowedScale.end()) {
+            std::cout << QString("警告 : 震度の閾値が不正です - 設定値 : %1").arg(m_Scale).toStdString() << std::endl;
+            std::cout << QString("強制的に50 (震度5強) に設定されます").toStdString() << std::endl;
+
+            m_Scale = 50;
+        }
+
         File.close();
     }
     catch(QException &ex) {
@@ -1622,7 +1721,7 @@ int Runner::getConfiguration(QString &filepath)
 
 
 // 現在、"--sysconf"オプションおよび"--version"オプション以外のオプションは無効
-[[maybe_unused]] void Runner::GetOption()
+[[maybe_unused]] [[maybe_unused]] void Runner::GetOption()
 {
     // コマンドラインのオプションを確認
     // 設定ファイルよりもオプションの設定が優先される
@@ -1759,8 +1858,7 @@ Article Runner::selectArticle()
 
 #ifdef _DEBUG
     // 生成された乱数を出力
-    qDebug() << QString("生成された乱数 : この値を取得したニュース記事群の配列の要素数とする : %1").arg(randomValue);
-    qDebug() << "";
+    std::cout << QString("生成された乱数 : この値を取得したニュース記事群の配列の要素数とする : %1").arg(randomValue).toStdString() << std::endl << std::endl;
 #endif
 
     return m_BeforeWritingArticles.at(randomValue);
@@ -1795,7 +1893,7 @@ int Runner::writeJSON(Article &article)
         // JSONファイルを作成
         QFile file(m_WriteFile);
         if (!file.open(QIODevice::WriteOnly)) {
-            std::cerr << QString("エラー : ファイルを開けませんでした").toStdString() << std::endl;
+            std::cerr << QString("エラー : ファイルのオープンに失敗 %1").arg(file.errorString()).toStdString() << std::endl;
             return -1;
         }
 
@@ -1817,7 +1915,7 @@ int Runner::truncateJSON()
         // JSONファイルを作成
         QFile File(m_WriteFile);
         if (!File.open(QIODevice::WriteOnly)) {
-            std::cerr << QString("エラー : ファイルを開けませんでした").toStdString() << std::endl;
+            std::cerr << QString("エラー : ファイルのオープンに失敗 %1").arg().toStdString(file.errorString()) << std::endl;
             return -1;
         }
 
@@ -2027,7 +2125,7 @@ int Runner::deleteLogNotToday()
         auto pubDate = QDate::fromString(pubDateString, "yyyy年M月d日");
 
         // 現在の日付と公開日の日付の差
-        int daysDiff = pubDate.daysTo(currentDate);
+        auto daysDiff = pubDate.daysTo(currentDate);
 
         // ニュース記事の公開日が前日までの場合は残す
         if (daysDiff >= 0 && daysDiff <= 1) {
@@ -2144,6 +2242,67 @@ int Runner::getDatafromWrittenLog()
 }
 
 
+// 緊急地震速報(警報)および発生した地震情報を取得する割り込みスロット
+void Runner::getEarthQuake()
+{
+    // ニュース記事取得タイマを一時停止
+    [[maybe_unused]] auto remainingTime = static_cast<int>(m_timer.remainingTime());
+    QMetaObject::invokeMethod(&m_timer, "stop", Qt::QueuedConnection);
+
+    // 処理開始時刻
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // 緊急地震速報(警報)および発生した地震情報を取得
+    // デフォルト
+    // 緊急地震速報(警報) : 30[秒]以内の最新情報 (1件のみ)
+    // 発生した地震情報 : 5[分]以内の最新情報 (1件のみ)
+
+    // ただし、緊急地震速報(警報)としての内容や配信品質は無保証であるため、利用は非推奨となっている
+    // 遅延や欠落のリスクは以下の通り
+    // - 処理遅延 : WebSocket APIは約70[ms]、JSON APIは約1000[ms] (高負荷時はさらに遅延する)
+    // - サーバ所在地 : 東京 (Linode Tokyo 2)
+    // - 欠落リスク : サーバや受信プログラムは冗長化しておらず、障害時は配信できず復旧時の再配信もない
+    if (m_bEQAlert || m_bEQInfo) {
+        // スレッドを立てる場合の不要な情報を除去
+        THREAD_INFO ThreadInfo = m_ThreadInfo;
+        ThreadInfo.subject = "";
+        ThreadInfo.from    = "";
+        ThreadInfo.mail    = "";
+        ThreadInfo.message = "";
+        ThreadInfo.key     = "";
+
+        // 地震情報を取得して新規スレッドを作成する
+        //EarthQuake EQObject(m_bEQAlert, m_bEQInfo, m_Scale, m_AlertFile, m_InfoFile, m_RequestURL, ThreadInfo, nullptr);
+        //auto futureEQ = QtConcurrent::run(&EQObject, &EarthQuake::EQProcess);
+
+        if (m_pEarthQuake == nullptr) {
+            m_pEarthQuake = std::make_unique<EarthQuake>(m_bEQAlert, m_bEQInfo, m_Scale, m_AlertFile, m_InfoFile, m_RequestURL, ThreadInfo, this);
+        }
+
+        auto futureEQ = QtConcurrent::run(m_pEarthQuake.get(), &EarthQuake::EQProcess);
+
+        // 終了まで待機
+        futureEQ.waitForFinished();
+
+        // 結果を取得
+        [[maybe_unused]] auto ret = futureEQ.result();
+    }
+
+    // 処理終了時刻
+    // 経過時間を計算 (ミリ秒単位)
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
+
+#ifdef _DEBUG
+    std::cout << QString("地震情報の処理に掛かった時刻 : %1 [mS]").arg(duration).toStdString() << std::endl;
+#endif
+
+    // 地震情報取得タイマを再開
+    m_EQTimer.setInterval(m_EQInterval);
+    QMetaObject::invokeMethod(&m_EQTimer, "start", Qt::QueuedConnection);
+}
+
+
 // [q]キーまたは[Q]キー ==> [Enter]キーを押下した場合、メインループを抜けて本ソフトウェアを終了する
 void Runner::onReadyRead()
 {
@@ -2151,7 +2310,7 @@ void Runner::onReadyRead()
     QTextStream tstream(stdin);
     QString line = tstream.readLine();
 
-    if (line.compare("q", Qt::CaseSensitive) == 0) {
+    if (line.compare("q", Qt::CaseInsensitive) == 0) {
         m_stopRequested.store(true);
 
         QCoreApplication::exit();

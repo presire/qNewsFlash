@@ -26,9 +26,9 @@ private:  // Methods
 
 public:   // Methods
     explicit HtmlFetcher(long long maxParagraph, QObject *parent = nullptr);
-    virtual  ~HtmlFetcher();
+     ~HtmlFetcher() override;
     int      fetch(const QUrl &url, bool redirect = false, const QString& _xpath = "//head/meta[@name='description']/@content");
-    QString  getParagraph() const;
+    [[nodiscard]] QString  getParagraph() const;
 
 signals:
 

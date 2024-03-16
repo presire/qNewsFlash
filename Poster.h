@@ -11,22 +11,25 @@
 #include <QUrlQuery>
 #include <QObject>
 #include <memory>
+#include <utility>
 
 
-// 書き込むスレッド
+// スレッド情報
 struct THREAD_INFO
 {
-    THREAD_INFO() {};
-    THREAD_INFO(QString _subject, QString _from, QString _mail, QString _message, QString _bbs, QString _time, QString _key)
-        : subject(_subject), from(_from), mail(_mail), bbs(_bbs), time(_time), key(_key) {
-    }
-    QString subject     = "";
+    THREAD_INFO() = default;
+
+    [[maybe_unused]] THREAD_INFO(QString _subject, QString _from, QString _mail, QString _message,
+                                 QString _bbs, QString _time, QString _key) :
+                                 subject(std::move(_subject)), from(std::move(_from)), mail(std::move(_mail)), bbs(std::move(_bbs)),
+                                 message(std::move(_message)), time(std::move(_time)), key(std::move(_key)) {}
+    QString subject     = "";   // スレッドタイトル名 (スレッドを立てる場合のみ入力)
     QString from        = "";
-    QString mail        = "";
-    QString message     = "";
-    QString bbs         = "";
-    QString time        = "";
-    QString key         = "";
+    QString mail        = "";   // メール欄
+    QString message     = "";   // 書き込む内容
+    QString bbs         = "";   // BBS名
+    QString time        = "";   // エポックタイム (UNIXタイムまたはPOSIXタイムとも呼ばれる)
+    QString key         = "";   // スレッド番号 (スレッドに書き込む場合のみ入力)
     bool    shiftjis    = true;
 };
 
@@ -36,21 +39,22 @@ class Poster : public QObject
     Q_OBJECT
 
 private:
-    std::unique_ptr<QNetworkAccessManager> m_pManager;
+    std::unique_ptr<QNetworkAccessManager> m_pManager;  // 掲示板にアクセスするためのネットワークオブジェクト
     QList<QNetworkCookie>                  m_Cookies;   // クッキーを保存
     QUrl                                   m_URL;       // 書き込み用URL
 
 private:
-    int         replyCookieFinished(QNetworkReply *reply);
-    int         replyPostFinished(QNetworkReply *reply);
-    QByteArray  encodeStringToShiftJIS(const QString &str);
-    QString     urlEncode(QByteArray byteArray);
+    int         replyCookieFinished(QNetworkReply *reply);                      // GETデータ(クッキー)を確認する
+    int         replyPostFinished(QNetworkReply *reply);                        // POSTデータ送信後のレスポンスを確認する
+    [[maybe_unused]] QByteArray  encodeStringToShiftJIS(const QString &str);    // 文字列をShift-JISにエンコードする
+    [[maybe_unused]] QString     urlEncode(const QByteArray& byteArray);               // エンコードされたバイト列をURLエンコードする
 
 public:
     explicit    Poster(QObject *parent = nullptr);
     ~Poster() override = default;
-    int         fetchCookies(const QUrl &url);
-    int         Post(const QUrl &url, THREAD_INFO &threadInfo);
+    int         fetchCookies(const QUrl &url);                                  // 掲示板のクッキーを取得する
+    int         PostforWriteThread(const QUrl &url, THREAD_INFO &threadInfo);   // 特定のスレッドに書き込む
+    int         PostforCreateThread(const QUrl &url, THREAD_INFO &threadInfo);  // 新規スレッドを作成する
 
 signals:
 

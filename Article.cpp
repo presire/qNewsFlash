@@ -1,5 +1,7 @@
 #include "Article.h"
 
+#include <utility>
+
 
 Article::Article(QObject *parent) : QObject{parent}
 {
@@ -20,16 +22,13 @@ Article::Article(const Article &obj, QObject *parent) noexcept : QObject{parent}
 
 
 Article::Article(QString title, QString paragraph, QString url, QString date, QObject *parent) :
-    m_Title(title), m_Paragraph(paragraph), m_URL(url), m_Date(date), QObject{parent}
+    m_Title(std::move(title)), m_Paragraph(std::move(paragraph)), m_URL(std::move(url)), m_Date(std::move(date)), QObject{parent}
 {
 
 }
 
 
-Article::~Article()
-{
-
-}
+Article::~Article() = default;
 
 
 Article& Article::operator=(const Article &other)
