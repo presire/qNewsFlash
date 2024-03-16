@@ -125,7 +125,7 @@ int Poster::PostforCreateThread(const QUrl &url, THREAD_INFO &threadInfo)
 
     // POSTデータの生成 (<form>タグの<input>要素に基づいてデータを設定)
     // 新規スレッドを作成する場合は、<input>要素のname属性の値"key"を除去する必要がある
-    QTextCodec *codec;                  // Shift-JIS用エンコードオブジェクト
+    QTextCodec *codec = nullptr;        // Shift-JIS用エンコードオブジェクト
     QByteArray encodedPostData = {};    // エンコードされたバイト列
 
     if (!threadInfo.shiftjis) {

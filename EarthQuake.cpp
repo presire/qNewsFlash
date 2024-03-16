@@ -382,7 +382,7 @@ int Worker::FormattingThreadInfo()
 
         // スレッドの内容
         /// 震源地
-        m_ThreadInfo.message  = name.isEmpty() ? QString("震源地 : 不明") : QString("震源地 : %1").arg(name + QString("\n"));
+        m_ThreadInfo.message  = name.isEmpty() ? QString("震源地 : 不明") : QString("震源地 : %1").arg(name + "\n");
 
         /// マグニチュード
         m_ThreadInfo.message += magnitude.isEmpty() ? QString("") : QString(magnitude + "\n");
@@ -394,12 +394,12 @@ int Worker::FormattingThreadInfo()
         /// 緯度
         auto latitude = m_Alert.m_Latitude.compare("-200", Qt::CaseSensitive) != 0 ?
                             QString("緯度 : %1度").arg(m_Alert.m_Latitude) : QString("緯度 : 情報なし");
-        m_ThreadInfo.message += latitude + QString("\n");
+        m_ThreadInfo.message += latitude + "\n";
 
         /// 経度
         auto longitude = m_Alert.m_Longitude.compare("-200", Qt::CaseSensitive) != 0 ?
                             QString("経度 : %1度").arg(m_Alert.m_Longitude) : QString("経度 : 情報なし");
-        m_ThreadInfo.message += longitude + QString("\n");
+        m_ThreadInfo.message += longitude + "\n";
 
         /// 地震発生時刻
         auto originTime     = m_Alert.m_OriginTime.isEmpty() ? QString("") : QString("地震発生時刻 : %1").arg(m_Alert.m_OriginTime + "\n");
@@ -413,7 +413,7 @@ int Worker::FormattingThreadInfo()
         /// 現在の仕様では、最大で7つのエリアまで表示する
         if (m_Alert.m_Areas.count() > 0) {
             /// メッセージを追加
-            m_ThreadInfo.message += QString("地震が予想される地域") + QString("\n");
+            m_ThreadInfo.message += QString("地震が予想される地域") + "\n";
         }
 
         auto count    = 0;
@@ -434,7 +434,7 @@ int Worker::FormattingThreadInfo()
                                                                               area.ScaleTo   == -1 ? "" : ConvertScale(area.ScaleTo));
             }
 
-            m_ThreadInfo.message +=  QString("\n");
+            m_ThreadInfo.message +=  "\n";
 
             /// 既に地震が到達しているかどうかを確認
             if (area.KindCode.compare("11", Qt::CaseSensitive) == 0) {
@@ -448,11 +448,11 @@ int Worker::FormattingThreadInfo()
 
         /// 7つの地域を超える地域が存在する場合、"その他の地域"と記載する
         if (m_Alert.m_Areas.count() > 7) {
-            m_ThreadInfo.message += QString("その他の地域") + QString("\n");
+            m_ThreadInfo.message += QString("その他の地域") + "\n";
         }
 
         if (kindcode) {
-            m_ThreadInfo.message += QString("\n") + QString("既に地震が到達していると予想されます") + QString("\n");
+            m_ThreadInfo.message += "\n" + QString("既に地震が到達していると予想されます") + "\n";
         }
 
         // メール欄を空欄にする
@@ -474,13 +474,13 @@ int Worker::FormattingThreadInfo()
 
         // スレッドの内容
         /// 震源地
-        m_ThreadInfo.message  = name.isEmpty() ? QString("震源地 : 不明") : QString("震源地 : %1").arg(name + QString("\n"));
+        m_ThreadInfo.message  = name.isEmpty() ? QString("震源地 : 不明") : QString("震源地 : %1").arg(name + "\n");
 
         /// 震度
-        m_ThreadInfo.message += maxscale.isEmpty() ? QString("震度情報なし") + QString("\n") : QString("%1").arg(maxscale + "\n");
+        m_ThreadInfo.message += maxscale.isEmpty() ? QString("震度情報なし") + "\n" : QString("%1").arg(maxscale + "\n");
 
         /// マグニチュード
-        m_ThreadInfo.message += magnitude.isEmpty() ? QString("マグニチュードの情報なし") + QString("\n") : QString(magnitude + "\n");
+        m_ThreadInfo.message += magnitude.isEmpty() ? QString("マグニチュードの情報なし") + "\n" : QString(magnitude + "\n");
 
         /// 震源の深さ
         auto depth = m_Info.m_Depth == "0" ? QString("ごく浅い") : m_Info.m_Depth == "-1" ? QString("情報なし") : QString(m_Info.m_Depth + "[km]");
@@ -493,7 +493,7 @@ int Worker::FormattingThreadInfo()
         /// 緯度
         auto latitude = m_Info.m_Latitude.compare("-200", Qt::CaseSensitive) != 0 ?
                             QString("緯度 : %1度").arg(m_Info.m_Latitude) : QString("緯度 : 情報なし");
-        m_ThreadInfo.message += latitude + QString("\n");
+        m_ThreadInfo.message += latitude + "\n";
 
         /// 経度
         auto longitude = m_Info.m_Longitude.compare("-200", Qt::CaseSensitive) != 0 ?
@@ -504,13 +504,13 @@ int Worker::FormattingThreadInfo()
         /// 現在の仕様では、最大で7つのエリアまで表示する
         if (m_Info.m_Points.count() > 0) {
             /// メッセージを追加
-            m_ThreadInfo.message += QString("発生した地震の地域") + QString("\n");
+            m_ThreadInfo.message += QString("発生した地震の地域") + "\n";
         }
 
         auto count = 0;
         for (auto &point : m_Info.m_Points) {
             auto scale = point.Scale;
-            m_ThreadInfo.message += QString("%1 : 震度 %2").arg(point.Addr, ConvertScale(scale)) + QString("\n");
+            m_ThreadInfo.message += QString("%1 : 震度 %2").arg(point.Addr, ConvertScale(scale)) + "\n";
 
             /// 7つの地域を超える地域が存在する場合、それ以上は記載しない
             if (count >= 6) break;
@@ -519,49 +519,49 @@ int Worker::FormattingThreadInfo()
 
         /// 7つの地域を超える地域が存在する場合、"その他の地域"と記載する
         if (m_Info.m_Points.count() > 7) {
-            m_ThreadInfo.message += QString("その他の地域") + QString("\n");
+            m_ThreadInfo.message += QString("その他の地域") + "\n";
         }
 
         /// 国内への津波の有無
         if (!m_Info.m_DomesticTsunami.isEmpty()) {
-            m_ThreadInfo.message += QString("\n") + QString("国内への津波の有無") + QString("\n");
+            m_ThreadInfo.message += "\n" + QString("国内への津波の有無") + "\n";
 
             if (m_Info.m_DomesticTsunami.compare("None", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("なし") + QString("\n");
+                m_ThreadInfo.message += QString("なし") + "\n";
             else if (m_Info.m_DomesticTsunami.compare("Unknown", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("不明") + QString("\n");
+                m_ThreadInfo.message += QString("不明") + "\n";
             else if (m_Info.m_DomesticTsunami.compare("Checking", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("調査中") + QString("\n");
+                m_ThreadInfo.message += QString("調査中") + "\n";
             else if (m_Info.m_DomesticTsunami.compare("NonEffective", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("若干の海面変動が予想されるが、被害の心配なし") + QString("\n");
+                m_ThreadInfo.message += QString("若干の海面変動が予想されるが、被害の心配なし") + "\n";
             else if (m_Info.m_DomesticTsunami.compare("Watch", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("津波注意報") + QString("\n");
+                m_ThreadInfo.message += QString("津波注意報") + "\n";
         }
 
         /// 海外での津波の有無
         if (!m_Info.m_ForeignTsunami.isEmpty()) {
-            m_ThreadInfo.message += QString("\n") + QString("海外への津波の有無") + QString("\n");
+            m_ThreadInfo.message += "\n" + QString("海外への津波の有無") + "\n";
 
             if (m_Info.m_ForeignTsunami.compare("None", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("なし") + QString("\n");
+                m_ThreadInfo.message += QString("なし") + "\n";
             else if (m_Info.m_ForeignTsunami.compare("Unknown", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("不明") + QString("\n");
+                m_ThreadInfo.message += QString("不明") + "\n";
             else if (m_Info.m_ForeignTsunami.compare("Checking", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("調査中") + QString("\n");
+                m_ThreadInfo.message += QString("調査中") + "\n";
             else if (m_Info.m_ForeignTsunami.compare("NonEffectiveNearby", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("震源の近傍で小さな津波の可能性があるが、被害の心配なし") + QString("\n");
+                m_ThreadInfo.message += QString("震源の近傍で小さな津波の可能性があるが、被害の心配なし") + "\n";
             else if (m_Info.m_ForeignTsunami.compare("WarningNearby", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("震源の近傍で津波の可能性がある") + QString("\n");
+                m_ThreadInfo.message += QString("震源の近傍で津波の可能性がある") + "\n";
             else if (m_Info.m_ForeignTsunami.compare("WarningPacific", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("太平洋で津波の可能性がある") + QString("\n");
+                m_ThreadInfo.message += QString("太平洋で津波の可能性がある") + "\n";
             else if (m_Info.m_ForeignTsunami.compare("WarningPacificWide", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("太平洋の広域で津波の可能性がある") + QString("\n");
+                m_ThreadInfo.message += QString("太平洋の広域で津波の可能性がある") + "\n";
             else if (m_Info.m_ForeignTsunami.compare("WarningIndian", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("インド洋で津波の可能性がある") + QString("\n");
+                m_ThreadInfo.message += QString("インド洋で津波の可能性がある") + "\n";
             else if (m_Info.m_ForeignTsunami.compare("WarningIndianWide", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("インド洋の広域で津波の可能性がある") + QString("\n");
+                m_ThreadInfo.message += QString("インド洋の広域で津波の可能性がある") + "\n";
             else if (m_Info.m_ForeignTsunami.compare("Potential", Qt::CaseSensitive) == 0)
-                m_ThreadInfo.message += QString("一般にこの規模では津波の可能性がある") + QString("\n");
+                m_ThreadInfo.message += QString("一般にこの規模では津波の可能性がある") + "\n";
         }
 
         // メール欄を空欄にする
