@@ -1,6 +1,7 @@
 #include <QTextCodec>
 #include <iostream>
 #include "Poster.h"
+#include "HtmlFetcher.h"
 
 
 Poster::Poster(QObject *parent) : m_pManager(std::make_unique<QNetworkAccessManager>(this)), QObject{parent}
@@ -27,7 +28,7 @@ int Poster::fetchCookies(const QUrl &url)
 }
 
 
-// GETデータを確認する
+// GETデータ(クッキー)を確認する
 int Poster::replyCookieFinished(QNetworkReply *reply)
 {
     // レスポンスからクッキーを取得
@@ -51,40 +52,40 @@ int Poster::replyCookieFinished(QNetworkReply *reply)
 
 
 // 特定のスレッドに書き込む
-int Poster::PostforWriteThread(const QUrl &url, THREAD_INFO &threadInfo)
+int Poster::PostforWriteThread(const QUrl &url, THREAD_INFO &ThreadInfo)
 {
     // リクエストの作成
     QNetworkRequest request(url);
 
     // POSTデータの生成 (<form>タグの<input>要素に基づいてデータを設定)
     // 既存のスレッドに書き込む場合は、<input>要素のname属性の値"key"にスレッド番号を指定する必要がある
-    QTextCodec *codec = nullptr;        // Shift-JIS用エンコードオブジェクト
+    QTextCodec *codec;                  // Shift-JIS用エンコードオブジェクト
     QByteArray encodedPostData = {};    // エンコードされたバイト列
 
-    if (!threadInfo.shiftjis) {
+    if (!ThreadInfo.shiftjis) {
         // UTF-8用 (QUrlQueryクラスはShift-JISに非対応)
         QUrlQuery query;
 
-        query.addQueryItem("subject",   threadInfo.subject);    // スレッドタイトル名 (スレッドに書き込む場合は空欄にする)
-        query.addQueryItem("FROM",      threadInfo.from);
-        query.addQueryItem("mail",      threadInfo.mail);       // メール欄
-        query.addQueryItem("MESSAGE",   threadInfo.message);    // 書き込む内容
-        query.addQueryItem("bbs",       threadInfo.bbs);        // BBS名
-        query.addQueryItem("time",      threadInfo.time);       // エポックタイム (UNIXタイムまたはPOSIXタイム)
-        query.addQueryItem("key",       threadInfo.key);        // 書き込むスレッド番号 (スレッドに書き込む場合は入力する)
+        query.addQueryItem("subject",   ThreadInfo.subject);    // スレッドタイトル名 (スレッドに書き込む場合は空欄にする)
+        query.addQueryItem("FROM",      ThreadInfo.from);
+        query.addQueryItem("mail",      ThreadInfo.mail);       // メール欄
+        query.addQueryItem("MESSAGE",   ThreadInfo.message);    // 書き込む内容
+        query.addQueryItem("bbs",       ThreadInfo.bbs);        // BBS名
+        query.addQueryItem("time",      ThreadInfo.time);       // エポックタイム (UNIXタイムまたはPOSIXタイム)
+        query.addQueryItem("key",       ThreadInfo.key);        // 書き込むスレッド番号 (スレッドに書き込む場合は入力する)
 
         encodedPostData = query.toString(QUrl::FullyEncoded).toUtf8();  // POSTデータをバイト列へ変換
     }
     else {
         // Shift-JIS用
         QString postMessage = QString("subject=%1&FROM=%2&mail=%3&MESSAGE=%4&bbs=%5&time=%6&key=%7")
-                                  .arg(threadInfo.subject,  // スレッドのタイトル (スレッドに書き込む場合は空欄にする)
-                                       threadInfo.from,
-                                       threadInfo.mail,     // メール欄
-                                       threadInfo.message,  // 書き込む内容
-                                       threadInfo.bbs,      // BBS名
-                                       threadInfo.time,     // エポックタイム (UNIXタイムまたはPOSIXタイム)
-                                       threadInfo.key       // 書き込むスレッド番号 (スレッドに書き込む場合は入力する)
+                                  .arg(ThreadInfo.subject,  // スレッドのタイトル (スレッドに書き込む場合は空欄にする)
+                                       ThreadInfo.from,
+                                       ThreadInfo.mail,     // メール欄
+                                       ThreadInfo.message,  // 書き込む内容
+                                       ThreadInfo.bbs,      // BBS名
+                                       ThreadInfo.time,     // エポックタイム (UNIXタイムまたはPOSIXタイム)
+                                       ThreadInfo.key       // 書き込むスレッド番号 (スレッドに書き込む場合は入力する)
                                        );
         auto postData   = postMessage.toUtf8();             // POSTデータをバイト列へ変換
 
@@ -113,43 +114,43 @@ int Poster::PostforWriteThread(const QUrl &url, THREAD_INFO &threadInfo)
     loop.exec();
 
     // レスポンス情報の取得
-    return replyPostFinished(pReply);
+    return replyPostFinished(pReply, ThreadInfo);
 }
 
 
 // 新規スレッドを作成する
-int Poster::PostforCreateThread(const QUrl &url, THREAD_INFO &threadInfo)
+int Poster::PostforCreateThread(const QUrl &url, THREAD_INFO &ThreadInfo)
 {
     // リクエストの作成
     QNetworkRequest request(url);
 
     // POSTデータの生成 (<form>タグの<input>要素に基づいてデータを設定)
     // 新規スレッドを作成する場合は、<input>要素のname属性の値"key"を除去する必要がある
-    QTextCodec *codec = nullptr;        // Shift-JIS用エンコードオブジェクト
+    QTextCodec *codec;                  // Shift-JIS用エンコードオブジェクト
     QByteArray encodedPostData = {};    // エンコードされたバイト列
 
-    if (!threadInfo.shiftjis) {
+    if (!ThreadInfo.shiftjis) {
         // UTF-8用 (QUrlQueryクラスはShift-JISに非対応)
         QUrlQuery query;
 
-        query.addQueryItem("subject",   threadInfo.subject);    // スレッドタイトル名 (スレッドを立てる場合は入力する)
-        query.addQueryItem("FROM",      threadInfo.from);
-        query.addQueryItem("mail",      threadInfo.mail);       // メール欄
-        query.addQueryItem("MESSAGE",   threadInfo.message);    // 書き込む内容
-        query.addQueryItem("bbs",       threadInfo.bbs);        // BBS名
-        query.addQueryItem("time",      threadInfo.time);       // エポックタイム (UNIXタイムまたはPOSIXタイム)
+        query.addQueryItem("subject",   ThreadInfo.subject);    // スレッドタイトル名 (スレッドを立てる場合は入力する)
+        query.addQueryItem("FROM",      ThreadInfo.from);
+        query.addQueryItem("mail",      ThreadInfo.mail);       // メール欄
+        query.addQueryItem("MESSAGE",   ThreadInfo.message);    // 書き込む内容
+        query.addQueryItem("bbs",       ThreadInfo.bbs);        // BBS名
+        query.addQueryItem("time",      ThreadInfo.time);       // エポックタイム (UNIXタイムまたはPOSIXタイム)
 
         encodedPostData = query.toString(QUrl::FullyEncoded).toUtf8();  // POSTデータをバイト列へ変換
     }
     else {
         // Shift-JIS用
         QString postMessage = QString("subject=%1&FROM=%2&mail=%3&MESSAGE=%4&bbs=%5&time=%6")
-                                  .arg(threadInfo.subject,  // スレッドのタイトル (スレッドを立てる場合のみ入力)
-                                       threadInfo.from,
-                                       threadInfo.mail,     // メール欄
-                                       threadInfo.message,  // 書き込む内容
-                                       threadInfo.bbs,      // BBS名
-                                       threadInfo.time      // エポックタイム (UNIXタイムまたはPOSIXタイム)
+                                  .arg(ThreadInfo.subject,  // スレッドのタイトル (スレッドを立てる場合のみ入力)
+                                       ThreadInfo.from,
+                                       ThreadInfo.mail,     // メール欄
+                                       ThreadInfo.message,  // 書き込む内容
+                                       ThreadInfo.bbs,      // BBS名
+                                       ThreadInfo.time      // エポックタイム (UNIXタイムまたはPOSIXタイム)
                                        );
         auto postData   = postMessage.toUtf8();             // POSTデータをバイト列へ変換
 
@@ -178,12 +179,12 @@ int Poster::PostforCreateThread(const QUrl &url, THREAD_INFO &threadInfo)
     loop.exec();
 
     // レスポンス情報の取得
-    return replyPostFinished(pReply);
+    return replyPostFinished(pReply, url, ThreadInfo);
 }
 
 
-// POSTデータ送信後のレスポンスを確認する
-int Poster::replyPostFinished(QNetworkReply *reply)
+// POSTデータ送信後のレスポンスを確認する (既存のスレッドに書き込み用)
+int Poster::replyPostFinished(QNetworkReply *reply, THREAD_INFO &ThreadInfo)
 {
     if (reply->error()) {
         std::cerr << QString("書き込みエラー : %1").arg(reply->errorString()).toStdString() << std::endl;
@@ -192,14 +193,120 @@ int Poster::replyPostFinished(QNetworkReply *reply)
         return -1;
     }
     else {
+        QTextCodec *codec;
+        QString replyData;
+
+        if (ThreadInfo.shiftjis) {
+            // Shift-JISからUTF-8へエンコード
+            codec     = QTextCodec::codecForName("Shift-JIS");
+            replyData = codec->toUnicode(reply->readAll());
+        }
+        else {
+            replyData = reply->readAll();
+        }
+
 #ifdef _DEBUG
-        qDebug() << reply->readAll();
+        std::cout << replyData.toStdString() << std::endl;
 #endif
+
+        // 書き込んだスレッドのパスと番号を取得
+        HtmlFetcher fetcher(nullptr);
+        if (fetcher.extractThreadPath(replyData, ThreadInfo.bbs)) {
+            std::cerr << QString("エラー : スレッドのURLとスレッド番号の取得に失敗").toStdString() << std::endl;
+            std::cerr << QString("スレッドの書き込みに失敗した可能性があります").toStdString() << std::endl;
+            reply->deleteLater();
+
+            return -1;
+        }
+
+        // 書き込みに成功した場合、レスポンス内容にスレッドのパスと番号が含まれている
+        // それらの情報が無ければ書き込みは失敗したと考えられる
+        if (fetcher.GetThreadPath().isEmpty() || fetcher.GetThreadNum().isEmpty()) {
+            std::cerr << QString("エラー : スレッドのURLまたはスレッド番号がありません").toStdString() << std::endl;
+            std::cerr << QString("スレッドの書き込みに失敗した可能性があります").toStdString() << std::endl;
+            reply->deleteLater();
+
+            return -1;
+        }
     }
 
     reply->deleteLater();
 
     return 0;
+}
+
+
+// POSTデータ送信後のレスポンスを確認する (新規スレッド作成用)
+int Poster::replyPostFinished(QNetworkReply *reply, const QUrl &url, const THREAD_INFO &ThreadInfo)
+{
+    if (reply->error()) {
+        std::cerr << QString("書き込みエラー : %1").arg(reply->errorString()).toStdString() << std::endl;
+        reply->deleteLater();
+
+        return -1;
+    }
+    else {
+        QTextCodec *codec;
+        QString replyData;
+
+        if (ThreadInfo.shiftjis) {
+            // Shift-JISからUTF-8へエンコード
+            codec     = QTextCodec::codecForName("Shift-JIS");
+            replyData = codec->toUnicode(reply->readAll());
+        }
+        else {
+            replyData = reply->readAll();
+        }
+
+#ifdef _DEBUG
+        std::cout << replyData.toStdString() << std::endl;
+#endif
+
+        // 新規作成したスレッドのURLのパスを取得
+        HtmlFetcher fetcher(nullptr);
+        if (fetcher.extractThreadPath(replyData, ThreadInfo.bbs)) {
+            std::cerr << QString("エラー : 新規作成したスレッドのURLとスレッド番号の取得に失敗").toStdString() << std::endl;
+            std::cerr << QString("スレッドの新規作成に失敗した可能性があります").toStdString() << std::endl;
+            reply->deleteLater();
+
+            return -1;
+        }
+
+        if (fetcher.GetThreadPath().isEmpty() || fetcher.GetThreadNum().isEmpty()) {
+            std::cerr << QString("エラー : 新規作成したスレッドのURLまたはスレッド番号がありません").toStdString() << std::endl;
+            std::cerr << QString("スレッドの新規作成に失敗した可能性があります").toStdString() << std::endl;
+            reply->deleteLater();
+
+            return -1;
+        }
+
+        // ベースURLを構築
+        QUrl baseUrl = url.adjusted(QUrl::RemovePath | QUrl::RemoveQuery | QUrl::RemoveFragment);
+
+        // ベースURLとパスを繋げて新規作成したスレッドのURLを取得
+        m_NewThreadURL = baseUrl.scheme() + "://" + baseUrl.host() + fetcher.GetThreadPath();
+
+        // 新規作成したスレッド番号を取得
+        m_NewThreadNum = fetcher.GetThreadNum();
+    }
+
+    reply->deleteLater();
+
+    return 0;
+}
+
+
+// 新規作成したスレッドのパスを取得する
+QString Poster::GetNewThreadURL() const
+{
+    return m_NewThreadURL;
+}
+
+
+// 新規作成したスレッドのスレッド番号を取得する
+QString Poster::GetNewThreadNum() const
+{
+    return m_NewThreadNum;
 }
 
 

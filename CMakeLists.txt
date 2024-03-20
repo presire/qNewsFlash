@@ -61,16 +61,14 @@ link_directories(${LIBXML2_LIBRARY_DIRS})
 
 
 # pkg-configを使用してQtライブラリを検索
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Network Concurrent)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Network Concurrent)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Network)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Network)
 
 ## Qtのpkg-configファイル
 pkg_check_modules(QT_CORE     Qt${QT_VERSION_MAJOR}Core REQUIRED IMPORTED_TARGET)
 pkg_check_modules(QT_NETWORK  Qt${QT_VERSION_MAJOR}Network REQUIRED IMPORTED_TARGET)
-pkg_check_modules(QT_NETWORK  Qt${QT_VERSION_MAJOR}Concurrent REQUIRED IMPORTED_TARGET)
 
 ## Qt 5.15未満はビルドエラー
-#set(QT_MINIMUM_VERSION 5.15)
 if(QT_VERSION VERSION_LESS 5.15.0)
     message(FATAL_ERROR "Qt version must be greater than or equal to 5.15.0")
 endif()
@@ -83,7 +81,6 @@ add_executable(qNewsFlash
         Article.h Article.cpp
         RandomGenerator.h RandomGenerator.cpp
         Poster.h Poster.cpp
-        EarthQuake.h EarthQuake.cpp
 )
 
 
@@ -137,7 +134,6 @@ target_include_directories(qNewsFlash PRIVATE
 target_link_libraries(qNewsFlash
         Qt${QT_VERSION_MAJOR}::Core
         Qt${QT_VERSION_MAJOR}::Network
-        Qt${QT_VERSION_MAJOR}::Concurrent
         ${LIBXML2_LIBRARIES}
 )
 

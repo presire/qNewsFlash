@@ -24,18 +24,18 @@
 class RandomGenerator
 {
 private:  // Variables
-    uint64_t m_state[2];    // Xorshiftで使用
+    uint64_t m_state[2]{};    // Xorshiftで使用
 
 private:  // Methods
-    unsigned long long getTSC();                         // CPUのタイムスタンプカウンタ(TSC)を取得
-    unsigned long long csprng();                         // システムが提供する暗号論的に安全な乱数生成器(CSPRNG)から値を取得
-    unsigned long long hashTSC(unsigned long long tsc);  // CPUのタイムスタンプカウンタ(TSC)の値にハッシュ処理を施す
-    uint64_t           next();                           // シード用Xorshift
+    unsigned long long getTSC();                                // CPUのタイムスタンプカウンタ(TSC)を取得
+    unsigned long long csprng();                                // システムが提供する暗号論的に安全な乱数生成器(CSPRNG)から値を取得
+    static unsigned long long hashTSC(unsigned long long tsc);  // CPUのタイムスタンプカウンタ(TSC)の値にハッシュ処理を施す
+    uint64_t           next();                                  // シード用Xorshift
 
 public:   // Methods
     explicit RandomGenerator();
     virtual  ~RandomGenerator();
-    int      Generate(int maxValue);                     // 乱数の生成 (一様分布)
+    int      Generate(int maxValue);                            // 乱数の生成 (一様分布)
 };
 
 #endif // RANDOMGENERATOR_H

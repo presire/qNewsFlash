@@ -5,8 +5,8 @@ URL : https://github.com/presire/qNewsFlash
 <br>
 
 # はじめに  
-qNewsFlashは、News APIや時事ドットコム等のニュース記事を取得して、掲示板等に書き込むソフトウェアです。  
-0chの場合、既存のスレッドにのみニュース記事を自動的に書き込むことができます。  
+qNewsFlashは、News APIや時事ドットコム等のニュース記事を取得して、0ch系の掲示板に書き込むソフトウェアです。  
+現在、既存のスレッドにのみニュース記事を自動的に書き込むことができます。  
 
 現在対応しているニュースサイトは、以下の通りです。  
 
@@ -42,7 +42,6 @@ README.mdでは、Red Hat Enterprise LinuxおよびSUSE Linux Enterprise / openS
 
 * Qt5 Core
 * Qt5 Network
-* Qt5 Concurrent
   * <https://www.qt.io/>  
   * qNewsFlashは、Qtライブラリを使用しています。
   * 本ソフトウェアで使用しているQtライブラリは、LGPL v3オープンソースライセンスの下で利用可能です。  
@@ -70,7 +69,7 @@ README.mdでは、Red Hat Enterprise LinuxおよびSUSE Linux Enterprise / openS
     sudo zypper update  
     sudo zypper install coreutils make cmake gcc gcc-c++ libxml2-devel \  
                         libqt5-qtbase-common-devel libQt5Core-devel    \  
-                        libQt5Network-devel libQt5Concurrent-devel  
+                        libQt5Network-devel  
 
     # Debian GNU/Linux, Raspberry Pi OS  
     sudo apt update && sudo apt upgrade  
@@ -78,6 +77,7 @@ README.mdでは、Red Hat Enterprise LinuxおよびSUSE Linux Enterprise / openS
                      qtbase5-dev  
 <br>
 <br>
+
 
 # 2. ビルドおよびインストール
 ## 2.1. qNewsFlashのビルドおよびインストール
@@ -201,7 +201,6 @@ Systemdサービスを使用せずに、qNewsFlashを実行することもでき
 ## 2.4 ワンショット機能とCron
 
 Cronを使用して本ソフトウェアを連携する場合は、設定ファイルの<code>autofetch</code>を<code>false</code>に設定して、ワンショット機能を有効にします。  
-**ただし、ワンショット機能が有効の場合は、地震情報の取得はできないことに注意してください。**  
 <br>
 
 以下は、Crontabファイルを編集して、7:00から22:00まで1時間ごとに本ソフトウェアを実行する設定例です。  
@@ -436,22 +435,23 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   POSTデータとして送信します。  
   書き込み時に必須です。  
   <br>
-* time  
-  デフォルト値 : 空欄  
-  書き込む時刻を指定します。  
-  この時刻は、エポックタイム (UnixタイムまたはPOSIXタイムとも呼ばれる) を指します。  
-  これは、1970年1月1日00:00:00 UTCからの経過秒数を表しています。  
+* <del>time</del>  
+  **<u>qNewsFlash 0.1.7以降、この設定は不要になりました。</u>**  
   <br>
-  掲示板によっては、この値は意味をなさない可能性があります。  
-  POSTデータとして送信します。  
+  <del>デフォルト値 : 空欄</del>  
+  <del>書き込む時刻を指定します。</del>  
+  <del>この時刻は、エポックタイム (UnixタイムまたはPOSIXタイムとも呼ばれる) を指します。</del>  
+  <del>これは、1970年1月1日00:00:00 UTCからの経過秒数を表しています。</del>  
+  <br>
+  <del>掲示板によっては、この値は意味をなさない可能性があります。</del>  
+  <del>POSTデータとして送信します。</del>  
   <br>
 * key  
   デフォルト値 : 空欄  
   ニュース記事を書き込むスレッド番号を指定します。  
   POSTデータとして送信します。  
   <br>
-  既存のスレッドに書き込む場合は必須です。  
-  ただし、地震情報の取得機能では不要です。  
+  既存のスレッドに書き込む場合は必須です。   
   <br>
 * chtt  
   デフォルト値 : <code>false</code>  
@@ -466,140 +466,13 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   0ch系は、Shift-JISを指定 (<code>**true**</code>) することを推奨します。  
 
 <br>
-
-qNewsFlash 0.1.6以降、地震情報を取得して新規スレッドを作成することが可能になりました。  
-<u>この機能を使用する場合は、<code>autofetch</code>を<code>true</code>に指定する必要があります。</u>  
-したがって、Cronとの連携は不可となっておりますのでご注意ください。  
-
-2024年3月現在、動作確認をほぼ行っていないためアルファ機能となります。  
-
-**ただし、本ソフトウェアはリアルタイム性を保証できないため、緊急地震速報(警報)の機能につきましては使用は非推奨としております。**  
-
-* alert  
-  デフォルト値 : <code>false</code>  
-  緊急地震速報(警報)のデータを取得するかどうかを指定します。  
-  現在時刻から30[秒]以内に発令された緊急地震速報の場合のみ取得します。  
-  デフォルト値はfalse (無効) です。  
-  <br>
-* alertlog  
-  デフォルト値 : <code>/tmp/eqalert.log</code>  
-  緊急地震速報(警報)の地震IDを保存するログファイルのパスを指定します。  
-  これは、同じ地震情報を取得して新規スレッドを作成することがないように保存しています。  
-  <br>
-* info  
-  デフォルト値 : <code>false</code>  
-  発生した地震情報のデータを取得するかどうかを指定します。  
-  現在時刻から5[分]以内に起きた地震情報の場合のみ取得します。  
-  デフォルト値はfalse (無効) です。  
-  <br>
-* alertlog  
-  デフォルト値 : <code>/tmp/eqinfo.log</code>  
-  発生した地震情報の地震IDを保存するログファイルのパスを指定します。  
-  これは、同じ地震情報を取得して新規スレッドを作成することがないように保存しています。  
-  <br>
-* interval  
-  デフォルト値 : <code>10</code>  
-  P2P地震情報から地震情報のデータを取得する時間間隔 (秒) を指定します。  
-  デフォルト値は10[秒]です。  
-  <br>
-  10[秒]未満、または、60[秒]を超える値を指定した場合は、強制的に10[秒]に指定されます。  
-  <br>
-  <u>ただし、1分間に60リクエストまでというレート制限があります。</u>  
-  <u>それを超えるとレスポンスが遅くなったり拒否 (HTTP ステータスコード 429) される場合があります。</u>  
-  <br>
-* scale  
-  デフォルト値 : <code>50</code>  
-  新規スレッドを作成するための基準となる震度を指定します。  
-  指定可能な値以外を指定した場合は、強制的に50 (震度5強) に設定されます。  
-  <br>
-  デフォルト値は50 (震度5強) です。  
-  <br>
-  指定できる値は、以下の通りです。  
-  10 (震度1)
-  20 (震度2)
-  30 (震度3)
-  40 (震度4)
-  45 (震度5弱)
-  50 (震度5強)
-  55 (震度6弱)
-  60 (震度6強)
-  70 (震度7)
-
 <br>
 
-    {  
-      "api": "",  
-      "asahi": false,  
-      "autofetch": true,  
-      "bbs": "",  
-      "chtt": false,  
-      "cnet": true,  
-      "earthquake": {  
-        "alert": false,  
-        "alertlog": "/tmp/eqalert.log",  
-        "info": false,  
-        "infolog": "/tmp/eqinfo.log",  
-        "interval": 10,  
-        "scale": 50  
-      },  
-      "exclude": [  
-        "Kbc.co.jp",  
-        "Sponichi.co.jp",  
-        "Bunshun.jp",  
-        "Famitsu.com",  
-        "Sma.co.jp",  
-        "Oricon.co.jp",  
-        "Jleague.jp",  
-        "YouTube"  
-      ],  
-      "from": "",  
-      "hanj": false,  
-      "interval": "1800",  
-      "jiji": true,  
-      "key": "",  
-      "kyodo": true,  
-      "logfile": "/var/log/qNewsFlash_log.json",  
-      "mail": "",  
-      "maxpara": "100",  
-      "newsapi": false,  
-      "requesturl": "",  
-      "reuters": false,  
-      "shiftjis": true,  
-      "subject": "",  
-      "time": "",  
-      "update": "",  
-      "withinhours": "0",
-      "writefile": "/tmp/qNewsFlashWrite.json"  
-    }  
-<br>
-<br>
+# 5. 地震情報の取得
+**<u>qNewsFlash 0.1.7以降、地震情報を取得する機能を削除しました。</u>**  
 
-
-# 5 <del>書き込み用の記事ファイル - qNewsFlashWrite.jsonファイル</del>  
-
-**この設定ファイルは、qNewsFlash 0.1.0以降 使用されておりませんのでご注意ください。**  
-
-上記のセクションでも記載した通り、  
-このソフトウェアは、各ニュースサイトからニュース記事を複数取得して、その複数のニュース記事から自動的に1つのみを選択します。  
-このファイルは、その選択された(書き込み用)1つのニュース記事の情報が記載されています。 
-<br>
-
-記事の更新のタイミングにより、ファイル内容は上書きされます。  
-
-ユーザは、このファイルを利用して掲示板等に自動的に書き込むようなスクリプトを作成することができます。  
-<br>
-
-また、設定ファイルにより、このファイル名およびファイルのパスを自由に変更することができます。  
-<br>
-
-このファイルは、以下に示すようなフォーマットになっています。  
-
-    {
-      "date": "2024年3月6日 8時1分",
-      "paragraph": "米マイクロソフト（ＭＳ）は５日、基本ソフト（ＯＳ）「ウィンドウズ１１」搭載のパソコンで米グーグルの",
-      "title": "アンドロイドアプリ対応終了　ウィンドウズ１１、２５年に",
-      "url": "https://www.jiji.com/jc/article?k=2024030600270"
-    }
+この機能は、qEQAlertという別のソフトウェアに移行しましたので、宜しければそちらをご参照ください。  
+qEQAlertプロジェクトのGitHub : https://github.com/presire/qEQAlert  
 <br>
 <br>
 
@@ -639,5 +512,34 @@ qNewsFlash 0.1.6以降、地震情報を取得して新規スレッドを作成�
         "url": "https://www.jiji.com/jc/article?k=2024030600270"
       }
     ]
+<br>
+<br>
+
+
+# 7. <del>書き込み用の記事ファイル - qNewsFlashWrite.jsonファイル</del>  
+
+**この設定ファイルは、qNewsFlash 0.1.0以降 使用されておりませんのでご注意ください。**  
+
+上記のセクションでも記載した通り、  
+このソフトウェアは、各ニュースサイトからニュース記事を複数取得して、その複数のニュース記事から自動的に1つのみを選択します。  
+このファイルは、その選択された(書き込み用)1つのニュース記事の情報が記載されています。 
+<br>
+
+記事の更新のタイミングにより、ファイル内容は上書きされます。  
+
+ユーザは、このファイルを利用して掲示板等に自動的に書き込むようなスクリプトを作成することができます。  
+<br>
+
+また、設定ファイルにより、このファイル名およびファイルのパスを自由に変更することができます。  
+<br>
+
+このファイルは、以下に示すようなフォーマットになっています。  
+
+    {
+      "date": "2024年3月6日 8時1分",
+      "paragraph": "米マイクロソフト（ＭＳ）は５日、基本ソフト（ＯＳ）「ウィンドウズ１１」搭載のパソコンで米グーグルの",
+      "title": "アンドロイドアプリ対応終了　ウィンドウズ１１、２５年に",
+      "url": "https://www.jiji.com/jc/article?k=2024030600270"
+    }
 <br>
 <br>

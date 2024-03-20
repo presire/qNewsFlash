@@ -1,5 +1,12 @@
 #include <iostream>
+#include <regex>
 #include "HtmlFetcher.h"
+
+
+HtmlFetcher::HtmlFetcher(QObject *parent) : QObject{parent}
+{
+
+}
 
 
 HtmlFetcher::HtmlFetcher(long long maxParagraph, QObject *parent) : m_MaxParagraph(maxParagraph),
@@ -12,6 +19,7 @@ HtmlFetcher::HtmlFetcher(long long maxParagraph, QObject *parent) : m_MaxParagra
 HtmlFetcher::~HtmlFetcher() = default;
 
 
+// ニュース記事のURLにアクセスして、本文を取得する
 int HtmlFetcher::fetch(const QUrl &url, bool redirect, const QString& _xpath)
 {
     // リダイレクトを自動的にフォロー
@@ -33,6 +41,7 @@ int HtmlFetcher::fetch(const QUrl &url, bool redirect, const QString& _xpath)
 }
 
 
+// ニュース記事の本文を取得する
 int HtmlFetcher::fetchParagraph(QNetworkReply *reply, const QString& _xpath)
 {
     if (reply->error() != QNetworkReply::NoError) {
@@ -128,7 +137,100 @@ xmlXPathObjectPtr HtmlFetcher::getNodeset(xmlDocPtr doc, const xmlChar *xpath)
 }
 
 
+// 新規作成したスレッドからスレッドのパスおよびスレッド番号を取得する
+int HtmlFetcher::extractThreadPath(const QString &htmlContent, const QString &bbs)
+{
+    // HTMLコンテンツをパース
+    htmlDocPtr doc = htmlReadDoc((const xmlChar*)htmlContent.toStdString().c_str(), nullptr, "UTF-8", HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+
+    // XPathコンテキストを作成
+    xmlXPathContextPtr context = xmlXPathNewContext(doc);
+
+    // http-equivが"Refresh"であるmetaタグを見つけるXPathクエリ
+    xmlXPathObjectPtr result = xmlXPathEvalExpression((xmlChar*)"//meta[@http-equiv='Refresh']", context);
+
+    if(result != nullptr && result->nodesetval != nullptr) {
+        for(int i = 0; i < result->nodesetval->nodeNr; i++) {
+            xmlNodePtr node = result->nodesetval->nodeTab[i];
+
+            // content属性を取得
+            xmlChar* content = xmlGetProp(node, (xmlChar*)"content");
+            std::string contentStr((char*)content);
+            xmlFree(content);
+
+            // URLからスレッドパスを抽出
+            /// まず、URLの部分を抽出
+            /// <数値>;URL=/<ディレクトリ名  例. /path/to/test/read.cgi>/<BBS名>/<スレッド番号  例.  15891277>/<その他スレッドの情報  例. l10#bottom>
+            QString url(contentStr.c_str());
+            static QRegularExpression re1("URL=(.*)");
+            QRegularExpressionMatch urlMatch = re1.match(url);
+            if (urlMatch.hasMatch()) {
+                // 1番目のキャプチャグループ (URL以降の文字列) を取得
+                url = urlMatch.captured(1);
+            }
+
+            /// 次に、抽出したURLの部分からスレッドのパスを抽出
+            /// 正規表現パターン : 最後の "/" 以前を取得する
+            static QRegularExpression re2("^(.+/)[^/]+");
+            QRegularExpressionMatch match = re2.match(url);
+            if (match.hasMatch()) {
+                m_ThreadPath = match.captured(1);
+
+#ifdef _DEBUG
+                std::cout << QString("スレッドのパス : %1").arg(m_ThreadPath).toStdString() << std::endl;
+#endif
+            }
+
+            /// さらに、抽出したURLの部分からスレッド番号を抽出
+            auto urlStr = url.toStdString();
+            QString RegStr = QString("/[^/]+/%1/([^/]+)/").arg(bbs);
+            std::regex re3(RegStr.toStdString());
+            std::smatch ThreadNumMatch;
+            if (std::regex_search(urlStr, ThreadNumMatch, re3) && ThreadNumMatch.size() > 1) {
+                // スレッド番号を取得
+                m_ThreadNum = ThreadNumMatch[1].str().c_str();
+
+#ifdef _DEBUG
+                std::cout << QString("スレッド番号 : %1").arg(m_ThreadNum).toStdString() << std::endl;
+#endif
+            }
+        }
+    }
+
+    xmlXPathFreeObject(result);
+    xmlXPathFreeContext(context);
+    xmlFreeDoc(doc);
+
+    // スレッドのパスおよびスレッド番号の取得に失敗した場合はエラーとする
+    if (m_ThreadPath.isEmpty() && m_ThreadNum.isEmpty()) return -1;
+
+    return 0;
+}
+
+
+// 取得したニュース記事の本文の一部を渡す
 QString HtmlFetcher::getParagraph() const
 {
     return m_Paragraph;
+}
+
+
+// スレッドのパスを取得する
+QString HtmlFetcher::GetThreadPath() const
+{
+    return m_ThreadPath;
+}
+
+
+// スレッド番号を取得する
+QString HtmlFetcher::GetThreadNum() const
+{
+    return m_ThreadNum;
+}
+
+
+// エレメントを取得する
+QString HtmlFetcher::GetElement() const
+{
+    return m_Element;
 }

@@ -39,22 +39,29 @@ class Poster : public QObject
     Q_OBJECT
 
 private:
-    std::unique_ptr<QNetworkAccessManager> m_pManager;  // 掲示板にアクセスするためのネットワークオブジェクト
-    QList<QNetworkCookie>                  m_Cookies;   // クッキーを保存
-    QUrl                                   m_URL;       // 書き込み用URL
+    std::unique_ptr<QNetworkAccessManager> m_pManager;      // 掲示板にアクセスするためのネットワークオブジェクト
+    QList<QNetworkCookie>                  m_Cookies;       // クッキーを保存
+    QUrl                                   m_URL;           // 書き込み用URL
+    QString                                m_NewThreadURL,  // 新規作成したスレッドのURL
+                                           m_NewThreadNum;  // 新規作成したスレッド番号
 
 private:
-    int         replyCookieFinished(QNetworkReply *reply);                      // GETデータ(クッキー)を確認する
-    int         replyPostFinished(QNetworkReply *reply);                        // POSTデータ送信後のレスポンスを確認する
-    [[maybe_unused]] QByteArray  encodeStringToShiftJIS(const QString &str);    // 文字列をShift-JISにエンコードする
-    [[maybe_unused]] QString     urlEncode(const QByteArray& byteArray);               // エンコードされたバイト列をURLエンコードする
+    // GETデータ(Webページ)を確認する
+    int         replyCookieFinished(QNetworkReply *reply);                              // GETデータ(クッキー)を確認する
+    int         replyPostFinished(QNetworkReply *reply, THREAD_INFO &ThreadInfo);       // POSTデータ送信後のレスポンスを確認する (既存のスレッドに書き込み用)
+    int         replyPostFinished(QNetworkReply *reply, const QUrl &url,                // POSTデータ送信後のレスポンスを確認する (新規スレッド作成用)
+                                  const THREAD_INFO &ThreadInfo);
+    [[maybe_unused]] static QByteArray  encodeStringToShiftJIS(const QString &str);     // 文字列をShift-JISにエンコードする
+    [[maybe_unused]] static QString     urlEncode(const QByteArray& byteArray);         // エンコードされたバイト列をURLエンコードする
 
 public:
     explicit    Poster(QObject *parent = nullptr);
     ~Poster() override = default;
     int         fetchCookies(const QUrl &url);                                  // 掲示板のクッキーを取得する
-    int         PostforWriteThread(const QUrl &url, THREAD_INFO &threadInfo);   // 特定のスレッドに書き込む
-    int         PostforCreateThread(const QUrl &url, THREAD_INFO &threadInfo);  // 新規スレッドを作成する
+    int         PostforWriteThread(const QUrl &url, THREAD_INFO &ThreadInfo);   // 特定のスレッドに書き込む
+    int         PostforCreateThread(const QUrl &url, THREAD_INFO &ThreadInfo);  // 新規スレッドを作成する
+    [[nodiscard]] QString     GetNewThreadURL() const;                          // 新規作成したスレッドのURLを取得する
+    [[nodiscard]] QString     GetNewThreadNum() const;                          // 新規作成したスレッド番号を取得する
 
 signals:
 

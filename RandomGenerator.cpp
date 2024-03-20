@@ -7,16 +7,10 @@
 #include "RandomGenerator.h"
 
 
-RandomGenerator::RandomGenerator()
-{
-
-}
+RandomGenerator::RandomGenerator() = default;
 
 
-RandomGenerator::~RandomGenerator()
-{
-
-}
+RandomGenerator::~RandomGenerator() = default;
 
 
 // シード値を取得

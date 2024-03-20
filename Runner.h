@@ -6,7 +6,6 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QTimer>
-#include <QtConcurrent>
 
 #ifdef Q_OS_LINUX
     #include <QSocketNotifier>
@@ -21,7 +20,6 @@
 #include <memory>
 #include "Article.h"
 #include "Poster.h"
-#include "EarthQuake.h"
 
 
 class Runner : public QObject
@@ -37,7 +35,7 @@ private:  // Variables
 #ifdef Q_OS_LINUX
     std::unique_ptr<QSocketNotifier>        m_pNotifier;    // このソフトウェアを終了するためのキーボードシーケンスオブジェクト
 #elif Q_OS_WIN
-    std::unique_ptrQWinEventNotifier>       m_pNotifier;    // このソフトウェアを終了するためのキーボードシーケンスオブジェクト
+    std::unique_ptr<QWinEventNotifier>      m_pNotifier;    // このソフトウェアを終了するためのキーボードシーケンスオブジェクト
 #endif
 
     std::atomic<bool>                       m_stopRequested;
@@ -82,16 +80,6 @@ private:  // Variables
     QString                                 m_RequestURL;   // 記事を書き込むためのPOSTデータを送信するURL
     THREAD_INFO                             m_ThreadInfo;   // 記事を書き込むスレッドの情報
 
-    // 地震の情報
-    bool                                    m_bEQAlert,     // 緊急地震速報(警報)の有効 / 無効
-                                            m_bEQInfo;      // 発生した地震情報の有効 / 無効
-    int                                     m_Scale,        // 震度の閾値 (この震度以上の場合はスレッドを立てる)
-                                            m_EQInterval;   // 地震の情報を取得する時間間隔 (デフォルト : 10[秒]〜)
-    QString                                 m_AlertFile,    // 緊急地震速報(警報)のIDを保存するファイルパス
-                                            m_InfoFile;     // 発生した地震情報のIDを保存するファイルパス
-    QTimer                                  m_EQTimer;      // 地震の情報を取得するためのインターバル時間をトリガとするタイマ
-    std::unique_ptr<EarthQuake>             m_pEarthQuake;  // 地震情報クラスを管理するオブジェクト
-
 public:  // Variables
 
 private:  // Methods
@@ -116,12 +104,13 @@ private:  // Methods
     void        itemTagsforHanJ(xmlNode *a_node);           // ハンギョレジャパンのニュース記事(RSS)を分解して取得
     void        itemTagsforReuters(xmlNode *a_node);        // ロイター通信のニュース記事(RSS)を分解して取得
     static QString convertJPDate(QString &strDate);         // News APIのニュース記事にある日付を日本時間および"yyyy/M/d h時m分"に変換
-    static QString convertJPDateforKyodo(QString &strDate); // News APIのニュース記事にある日付を日本時間および"yyyy/M/d h時m分"に変換
+    static QString convertJPDateforKyodo(QString &strDate); // 共同通信のニュース記事にある日付を日本時間および"yyyy/M/d h時m分"に変換
     static QString convertDate(QString &strDate);           // 時事ドットコム、ロイター通信のニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
     static QString convertDateHanJ(QString &strDate);       // ハンギョレジャパンのニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
-    bool isToday(const QString &dateString);                // ニュース記事が今日の日付かどうかを確認
-    bool isHoursAgo(const QString &dateString);             // ニュース記事が数時間前の日付かどうかを確認
+    static bool isToday(const QString &dateString);         // ニュース記事が今日の日付かどうかを確認
+    bool isHoursAgo(const QString &dateString) const;       // ニュース記事が数時間前の日付かどうかを確認
     Article     selectArticle();                            // 取得したニュース記事群からランダムで1つを選択
+    static qint64  GetEpocTime();                           // 現在のエポックタイム (UNIX時刻) を秒単位で取得する
 
 #ifdef _BELOW_0_1_0
     int         writeJSON(Article &article);                // 選択したニュース記事をJSONファイルに保存
@@ -161,9 +150,6 @@ public slots:
     void fetchHanJRSS();    // ハンギョレジャパンからニュース記事の取得後に実行するスロット
     void fetchReutersRSS(); // ロイター通信からニュース記事の取得後に実行するスロット
     void onReadyRead();     // ノンブロッキングでキー入力を受信するスロット
-
-    // 地震情報
-    void getEarthQuake();   // 緊急地震速報(警報)および発生した地震情報を取得する割り込みスロット
 };
 
 #endif // RUNNER_H
