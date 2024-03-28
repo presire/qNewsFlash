@@ -241,7 +241,7 @@ void Runner::fetch()
 
         /// レスポンス待機
         QEventLoop loop;
-        QObject::connect(this, &Runner::NewAPIfished, &loop, &QEventLoop::quit);
+        QObject::connect(this, &Runner::NewAPIfinished, &loop, &QEventLoop::quit);
         loop.exec();
     }
 
@@ -386,6 +386,14 @@ void Runner::fetch()
     // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
     if (m_stopRequested.load()) return;
 
+    // ロイター通信の記事を取得
+    if (m_bTokyoNP) {
+        fetchTokyoNP();
+    }
+
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
+    if (m_stopRequested.load()) return;
+
     // 取得したニュース記事群を操作
     if (!m_BeforeWritingArticles.empty()) {
         // 取得したニュース記事群が存在する場合
@@ -404,18 +412,18 @@ void Runner::fetch()
         ///       また、CNTPCTレジスタにアクセスするライブラリのライセンスがGPLであるため現在は使用していない
         auto article = selectArticle();
 
-#ifndef _BELOW_0_1_0
         // ニュース記事のタイトル --> 公開日 --> 本文の一部 --> URL の順に並べて書き込む
         // ただし、ニュース記事の本文を取得しない場合は、ニュース記事のタイトル --> 公開日 --> URL の順とする
         auto [title, paragraph, link, pubDate] = article.getArticleData();
-
-        // スレッドのタイトルを変更するかどうか (防弾嫌儲およびニュース速報(Libre)等の掲示板で使用可能)
-        title = m_changeTitle ? QString("!chtt") + title : title;
 
         m_ThreadInfo.message = QString("%1%2%3%4").arg(QString(title + "\n"),
                                                        QString(pubDate + "\n\n"),
                                                        QString(paragraph.length() == 0 ? "" : QString(paragraph + "\n")),
                                                        QString(link + "\n"));
+
+        // 現在時刻をエポックタイムで取得
+        auto epocTime = GetEpocTime();
+        m_ThreadInfo.time = QString::number(epocTime);
 
         Poster poster(this);
 
@@ -425,17 +433,106 @@ void Runner::fetch()
             return;
         }
 
-        // 現在時刻をエポックタイムで取得
-        auto epocTime = GetEpocTime();
-        m_ThreadInfo.time = QString::number(epocTime);
+#if 1
+        // qNewsFlash 0.1.0から0.2.xまでの機能
 
-        // POSTデータの送信
+        // スレッドのタイトルを変更するかどうか (防弾嫌儲およびニュース速報(Libre)等の掲示板で使用可能)
+        if (m_changeTitle) m_ThreadInfo.message.prepend("!chtt");
+
+        // 既存のスレッドに書き込み
         if (poster.PostforWriteThread(QUrl(m_RequestURL), m_ThreadInfo)) {
-            // スレッドへの書き込みに失敗した場合
+            // 既存のスレッドへの書き込みに失敗した場合
             return;
         }
+#else
+        // 今後の予定 : qNewsFlash 0.3.0以降
 
-#elif _BELOW_0_1_0
+        // 指定のスレッドがレス数の上限に達して書き込めない場合、スレッドを新規作成する
+        HtmlFetcher fetcher(this);
+        if (fetcher.checkUrlExistence(QUrl(m_ThreadURL))) {
+            // 設定ファイルにあるスレッドのURLが存在する場合
+
+            // ニュース記事を書き込むスレッドのレス数を取得
+            auto ret = checkLastThreadNum();
+            if (ret == -1) {
+                // 最後尾のレス番号の取得に失敗した場合
+                std::cerr << QString("エラー : レス数の取得に失敗").toStdString() << std::endl;
+                return;
+            }
+            else if (ret == 1) {
+                // 既存のスレッドが最大レス数に達している場合、スレッドの新規作成
+
+                // 設定ファイルの"subject"キーの値が空欄の場合、ニュース記事のタイトルをスレッドのタイトルにする
+                // "subject"キーの値に%tトークンが存在する場合はニュース記事のタイトルに置換
+                if (m_ThreadInfo.subject.isEmpty()) {
+                    m_ThreadInfo.subject = title;
+                }
+                else {
+                    auto newTitle = replaceSubjectToken(m_ThreadInfo.subject, title);
+                    m_ThreadInfo.subject = !newTitle.isEmpty() ? newTitle : title;
+                }
+
+                if (poster.PostforCreateThread(QUrl(m_RequestURL), m_ThreadInfo)) {
+                    // スレッドの新規作成に失敗した場合
+                    return;
+                }
+
+                // 新規作成したスレッドのURLとスレッド番号を取得
+                m_ThreadURL      = poster.GetNewThreadURL();
+                m_ThreadInfo.key = poster.GetNewThreadNum();
+
+                // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+                if (UpdateThreadJson()) {
+                    // スレッド情報の保存に失敗
+                    return;
+                }
+            }
+            else {
+                // 既存のスレッドが存在する場合
+
+                // スレッドのタイトルを変更するかどうか (防弾嫌儲およびニュース速報(Libre)等の掲示板で使用可能)
+                if (m_changeTitle) m_ThreadInfo.message.prepend("!chtt");
+
+                // 既存のスレッドに書き込み
+                if (poster.PostforWriteThread(QUrl(m_RequestURL), m_ThreadInfo)) {
+                    // 既存のスレッドへの書き込みに失敗した場合
+                    return;
+                }
+            }
+        }
+        else {
+            // 設定ファイルにあるスレッドのURLが存在しない場合 (スレッドを新規作成する)
+
+            // 設定ファイルの"subject"キーの値が空欄の場合、ニュース記事のタイトルをスレッドのタイトルにする
+            // "subject"キーの値に%tトークンが存在する場合はニュース記事のタイトルに置換
+            if (m_ThreadInfo.subject.isEmpty()) {
+                m_ThreadInfo.subject = title;
+            }
+            else {
+                auto newTitle = replaceSubjectToken(m_ThreadInfo.subject, title);
+                m_ThreadInfo.subject = !newTitle.isEmpty() ? newTitle : title;
+            }
+
+            // スレッドの新規作成
+            if (poster.PostforCreateThread(QUrl(m_RequestURL), m_ThreadInfo)) {
+                // スレッドの新規作成に失敗した場合
+                return;
+            }
+
+            // 新規作成したスレッドのURLとスレッド番号を取得
+            m_ThreadURL      = poster.GetNewThreadURL();
+            m_ThreadInfo.key = poster.GetNewThreadNum();
+
+            // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+            if (UpdateThreadJson()) {
+                // スレッド情報の保存に失敗
+                return;
+            }
+        }
+
+#endif
+
+#ifdef _BELOW_0_1_0
         // qNewsFlash 0.1.0未満の機能
         // JSONファイル(スレッド書き込み用)に書き込む
         // 該当スレッドへの書き込み処理は各自で実装する
@@ -542,7 +639,7 @@ void Runner::fetchNewsAPI()
 
     m_pReply->deleteLater();
 
-    emit NewAPIfished();
+    emit NewAPIfinished();
 }
 
 
@@ -1222,6 +1319,199 @@ void Runner::fetchReutersRSS()
 }
 
 
+void Runner::fetchTokyoNP()
+{
+    HtmlFetcher fetcher(m_MaxParagraph, this);
+
+    // 東京新聞の総合ニュースからトップ記事を取得
+    // 総合ニュースからニュース記事を取得しない場合は、設定ファイルの"topxpath"キーを空欄にすること
+    if (!m_TokyoNPThumb.isEmpty()) {
+        if (fetcher.fetchElement(QUrl(m_TokyoNPFetchURL), true, m_TokyoNPThumb, XML_TEXT_NODE)) {
+            /// ヘッドラインニュースの記事の取得に失敗した場合
+            std::cerr << QString("エラー : 東京新聞のヘッドラインニュース記事のURL取得に失敗").toStdString() << std::endl;
+            return;
+        }
+
+        auto element = fetcher.GetElement();
+
+        /// 末尾の半角スペースを削除
+        if (element.endsWith(" ")) element.chop(1);
+
+        auto link = m_TokyoNPTopURL + element;
+
+        /// クエリパラメータを除去したURLを生成
+        QUrl url(link);
+        url.setQuery(QUrlQuery());
+        link = url.toString();
+
+        if (fetcher.fetchElement(QUrl(link), true, m_TokyoNPJSON, XML_CDATA_SECTION_NODE)) {
+            /// ヘッドラインニュースの記事内容の取得に失敗した場合
+            std::cerr << QString("エラー : 東京新聞のヘッドラインニュース記事内容の取得に失敗").toStdString() << std::endl;
+            return;
+        }
+
+        element = fetcher.GetElement();
+
+        /// 末尾の半角スペースを削除
+        if (element.endsWith(" ")) element.chop(1);
+
+        auto jsonData = element;
+        QJsonDocument document = QJsonDocument::fromJson(jsonData.toUtf8());
+        if(document.isNull()){
+            std::cerr << QString("エラー : 東京新聞のヘッドラインニュース記事内容のJSONオブジェクト生成に失敗").toStdString() << std::endl;
+            return;
+        }
+
+        if(!document.isObject()){
+            std::cerr << QString("エラー : 東京新聞のヘッドラインニュース記事内容のJSONオブジェクトに異常があります").toStdString() << std::endl;
+            return;
+        }
+
+        QJsonObject jsonObject = document.object();
+        auto title      = jsonObject.value("headline").toString();
+
+        auto paragraph  = jsonObject.value("description").toString();
+        if (paragraph.endsWith("...")) {
+            paragraph = (paragraph.size() - 3) > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
+        }
+        else {
+            paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
+        }
+
+        auto date       = jsonObject.value("datePublished").toString();
+
+        /// 日付のフォーマットをISO 8601形式から"yyyy年M月d日 h時m分"へ変更
+        date            = convertDate(date);
+
+        /// ニュースの公開日を確認
+        auto isCheckDate = m_WithinHours == 0 ? isToday(date) : isHoursAgo(date);
+        if (isCheckDate) {
+            /// 既に書き込み済みの記事の場合は無視
+            bool bWritten = false;
+            for (auto &writtenArticle : m_WrittenArticles) {
+                QString url = "";
+                std::tie(std::ignore, std::ignore, url, std::ignore) = writtenArticle.getArticleData();
+
+                if (url.compare(link, Qt::CaseSensitive) == 0) {
+                    bWritten = true;
+                    break;
+                }
+            }
+
+            if (!bWritten) {
+                /// 書き込む前の記事群
+                Article article(title, paragraph, link, date);
+                m_BeforeWritingArticles.append(article);
+
+#ifdef _DEBUG
+                qDebug() << "Title : " << title;
+                qDebug() << "Paragraph : " << paragraph;
+                qDebug() << "URL : " << link;
+                qDebug() << "Date : " << date;
+                qDebug() << "";
+#endif
+            }
+        }
+    }
+
+    // 東京新聞のその他ニュース記事の取得
+    if (fetcher.fetchElement(QUrl(m_TokyoNPFetchURL), true, m_TokyoNPNews, XML_TEXT_NODE)) {
+        // その他ニュース記事のURL取得に失敗した場合
+        std::cerr << QString("エラー : 東京新聞のニュース記事のURL取得に失敗").toStdString() << std::endl;
+        return;
+    }
+
+    auto element = fetcher.GetElement();
+
+    /// 末尾の半角スペースを削除
+    if (element.endsWith(" ")) element.chop(1);
+
+    /// リンク群からその他の各ニュース記事を取得
+    auto elements = element.split(" ");
+    foreach (const QString &item, elements) {
+        auto link = m_TokyoNPTopURL + item;
+
+        /// クエリパラメータを除去したURLを生成
+        QUrl url(link);
+        url.setQuery(QUrlQuery());
+        link = url.toString();
+
+        /// その他の各ニュース記事のURLにアクセスして、JSONオブジェクトの情報を取得
+        if (fetcher.fetchElement(QUrl(link), true, m_TokyoNPJSON, XML_CDATA_SECTION_NODE)) {
+            /// ヘッドラインニュースの記事の取得に失敗した場合
+            std::cerr << QString("エラー : 東京新聞のニュース記事内容の取得に失敗 %1").arg(link).toStdString() << std::endl;
+            return;
+        }
+
+        element = fetcher.GetElement();
+
+        /// 末尾の半角スペースを削除
+        if (element.endsWith(" ")) element.chop(1);
+
+        /// JSONオブジェクトの情報からニュース記事のタイトル、本文の一部、公開日を取得
+        auto jsonData = element;
+        auto document = QJsonDocument::fromJson(jsonData.toUtf8());
+        if(document.isNull()){
+            std::cerr << QString("エラー : 東京新聞のニュース記事のJSONオブジェクト生成に失敗").toStdString() << std::endl;
+            return;
+        }
+
+        if(!document.isObject()){
+            std::cerr << QString("エラー : 東京新聞のニュース記事のJSONオブジェクトに異常があります").toStdString() << std::endl;
+            return;
+        }
+
+        auto jsonObject = document.object();
+        auto title      = jsonObject.value("headline").toString();
+
+        auto paragraph  = jsonObject.value("description").toString();
+        if (paragraph.endsWith("...")) {
+            paragraph = (paragraph.size() - 3) >= m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
+        }
+        else {
+            paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
+        }
+
+        auto date       = jsonObject.value("datePublished").toString();
+
+        /// 日付のフォーマットをISO 8601形式から"yyyy年M月d日 h時m分"へ変更
+        date            = convertDate(date);
+
+        /// ニュースの公開日を確認
+        auto isCheckDate = m_WithinHours == 0 ? isToday(date) : isHoursAgo(date);
+        if (isCheckDate) {
+            /// 既に書き込み済みの記事の場合は無視
+            bool bWritten = false;
+            for (auto &writtenArticle : m_WrittenArticles) {
+                QString url = "";
+                std::tie(std::ignore, std::ignore, url, std::ignore) = writtenArticle.getArticleData();
+
+                if (url.compare(link, Qt::CaseSensitive) == 0) {
+                    bWritten = true;
+                    break;
+                }
+            }
+
+            if (!bWritten) {
+                /// 書き込む前の記事群
+                Article article(title, paragraph, link, date);
+                m_BeforeWritingArticles.append(article);
+
+#ifdef _DEBUG
+                qDebug() << "Title : " << title;
+                qDebug() << "Paragraph : " << paragraph;
+                qDebug() << "URL : " << link;
+                qDebug() << "Date : " << date;
+                qDebug() << "";
+#endif
+            }
+        }
+    }
+
+    return;
+}
+
+
 void Runner::itemTagsforReuters(xmlNode *a_node)
 {
     for (auto cur_node = a_node; cur_node; cur_node = cur_node->next) {
@@ -1471,12 +1761,38 @@ bool Runner::isHoursAgo(const QString &pubDate) const
 qint64 Runner::GetEpocTime()
 {
     // 現在の日時を取得
-    QDateTime now = QDateTime::currentDateTime();
+    QDateTime now = QDateTime::currentDateTime().toTimeZone(QTimeZone("Asia/Tokyo"));;
 
     // エポックタイム (UNIX時刻) を秒単位で取得
     qint64 epochTime = now.toSecsSinceEpoch();
 
     return epochTime;
+}
+
+
+// 文字列 %t をスレッドのタイトルへ変更
+QString Runner::replaceSubjectToken(QString subject, QString title)
+{
+    // エスケープされた"%t"トークンを一時的に保護
+    QString tempToken = "__TEMP__";
+    subject.replace("%%t", tempToken);
+
+    int count = subject.count("%t");
+    if (count > 1) {
+        std::cout << QString("警告 : \"%t\"トークンが複数存在します").toStdString() << std::endl;
+        subject.replace(tempToken, "%%t");
+
+        return QString();
+    }
+    else if (count == 1) {
+        // "%t"トークンをスレッドのタイトルに置換
+        subject.replace("%t", title);
+    }
+
+    // 保護されたトークンを元に戻す
+    subject.replace(tempToken, "%%t");
+
+    return subject;
 }
 
 
@@ -1516,6 +1832,9 @@ int Runner::getConfiguration(QString &filepath)
         // News APIの有効 / 無効
         m_bNewsAPI          = JsonObject["newsapi"].toBool(false);
 
+        // News APIのAPIキー
+        m_API           = JsonObject["api"].toString("");
+
         // 時事ドットコムの有効 / 無効
         m_bJiJi             = JsonObject["jiji"].toBool(true);
 
@@ -1534,8 +1853,31 @@ int Runner::getConfiguration(QString &filepath)
         // ロイター通信の有効 / 無効
         m_bReuters          = JsonObject["reuters"].toBool(false);
 
-        // News APIのAPIキー
-        m_API           = JsonObject["api"].toString("");
+        // tokyonp(東京新聞)オブジェクトの取得
+        auto tokyoNPObject  = JsonObject["tokyonp"].toObject();
+
+        /// 東京新聞の有効 / 無効
+        m_bTokyoNP          = tokyoNPObject["enable"].toBool(false);
+
+        /// 東京新聞のトップページのURL
+        m_TokyoNPTopURL     = tokyoNPObject["toppage"].toString("");
+        if (m_TokyoNPTopURL.isEmpty()) m_TokyoNPTopURL = QString("https://www.tokyo-np.co.jp");
+
+        /// 東京新聞からニュース記事を取得するページのURL
+        /// 例1. 総合ニュースを取得する場合 : https://www.tokyo-np.co.jp
+        /// 例2. 政治ニュースのみを取得する場合 : https://www.tokyo-np.co.jp/n/politics
+        /// 例3. 国際ニュースのみを取得する場合 : https://www.tokyo-np.co.jp/n/world
+        m_TokyoNPFetchURL   = tokyoNPObject["fetchurl"].toString("");
+        if (m_TokyoNPFetchURL.isEmpty()) m_TokyoNPFetchURL = QString("https://www.tokyo-np.co.jp");
+
+        /// 東京新聞のヘッドライン取得用XPath
+        m_TokyoNPThumb      = tokyoNPObject["topxpath"].toString("");
+
+        /// 東京新聞のその他ニュース記事の取得用XPath
+        m_TokyoNPNews       = tokyoNPObject["newsxpath"].toString("");
+
+        /// 東京新聞のその他ニュース記事の情報を取得するためのJSONオブジェクト用XPath
+        m_TokyoNPJSON       = tokyoNPObject["jsonpath"].toString("");
 
         // ニュース記事を取得する間隔
         auto interval    = JsonObject["interval"].toString("60 * 1000 * 30");
@@ -1545,7 +1887,7 @@ int Runner::getConfiguration(QString &filepath)
             std::cerr << QString("警告 : 設定ファイルのintervalキーの値が不正です").toStdString() << std::endl;
             std::cerr << QString("更新時間の間隔は、自動的に30分に設定されます").toStdString() << std::endl;
 
-            m_interval = 60 * 1000 * 30;
+            m_interval = 30 * 60 * 1000;
         }
         else {
             // ミリ秒に換算
@@ -1568,8 +1910,10 @@ int Runner::getConfiguration(QString &filepath)
             m_MaxParagraph = 100;
         }
 
-#ifndef _BELOW_0_1_0
-        // POSTデータを送信するURL
+#if 1
+        // qNewsFlash 0.1.0から0.2.xまでの機能
+
+        // 掲示板へPOSTデータを送信するURL
         m_RequestURL            = JsonObject["requesturl"].toString("");
 
         // スレッド情報
@@ -1579,7 +1923,61 @@ int Runner::getConfiguration(QString &filepath)
         m_ThreadInfo.bbs        = JsonObject["bbs"].toString("");       // BBS名
         m_ThreadInfo.key        = JsonObject["key"].toString("");       // スレッド番号
         m_ThreadInfo.shiftjis   = JsonObject["shiftjis"].toBool(true);  // Shift-JISの有効 / 無効
-#elif   _BELOW_0_1_0
+#else
+        // 今後の予定 : qNewsFlash 0.3.0以降
+
+        // スレッド情報
+        auto threadObject  = JsonObject["thread"].toObject();
+
+        /// 掲示板へPOSTデータを送信するURL
+        m_RequestURL       = threadObject["requesturl"].toString("");
+        if (m_RequestURL.isEmpty()) {
+            std::cerr << QString("エラー : 掲示板へPOSTデータを送信するURLが空欄です").toStdString() << std::endl;
+            return -1;
+        }
+
+        /// 書き込むスレッドのURL
+        m_ThreadURL        = threadObject["threadurl"].toString("");
+        if (m_ThreadURL.isEmpty()) {
+            std::cout << QString("スレッドのURLが空欄のため、スレッドを新規作成します").toStdString() << std::endl;
+        }
+
+        /// スレッドのレス数を取得するためのXPath
+        m_ThreadXPath      = threadObject["threadxpath"].toString("/html/body//div/dl[@class='thread']//div/@id");
+        if (m_ThreadXPath.isEmpty()) {
+            std::cerr << QString("エラー : スレッドのレス数を取得するためのXPathが空欄です").toStdString() << std::endl;
+            return -1;
+        }
+
+        /// スレッドの最大レス数
+        m_maxThreadNum          = threadObject["max"].toInt(1000);
+
+        /// POSTデータに関する情報
+        auto subject            = threadObject["subject"].toString("");   // スレッドのタイトル (スレッドを新規作成する場合)
+                                                                          // 空欄の場合、スレッドのタイトルは取得したニュース記事のタイトルとなる
+        /// エスケープされた%tトークンを一時的に保護
+        QString tempToken = "__TEMP__";
+        subject.replace("%%t", tempToken);
+
+        if (subject.count("%t") > 1) {
+            /// %tトークンが複数存在する場合はエラー
+            std::cerr << QString("エラー : \"%t\"トークンが複数存在します").toStdString() << std::endl;
+            return -1;
+        }
+        else {
+            /// 保護されたトークンを元に戻す
+            subject.replace(tempToken, "%%t");
+            m_ThreadInfo.subject = subject;
+        }
+
+        m_ThreadInfo.from       = threadObject["from"].toString("");      // 名前欄
+        m_ThreadInfo.mail       = threadObject["mail"].toString("");      // メール欄
+        m_ThreadInfo.bbs        = threadObject["bbs"].toString("");       // BBS名
+        m_ThreadInfo.key        = threadObject["key"].toString("");       // スレッド番号
+        m_ThreadInfo.shiftjis   = threadObject["shiftjis"].toBool(true);  // Shift-JISの有効 / 無効
+#endif
+
+#ifdef   _BELOW_0_1_0
         // qNewsFlash 0.1.0未満の機能
         // スレッド書き込み用のJSONファイルのパス
         auto writeFile = JsonObject["writefile"].toString("/tmp/qNewsFlashWrite.json");
@@ -1787,7 +2185,7 @@ Article Runner::selectArticle()
 
 #ifdef _DEBUG
     // 生成された乱数を出力
-    std::cout << QString("生成された乱数 : この値を取得したニュース記事群の配列の要素数とする : %1").arg(randomValue).toStdString() << std::endl << std::endl;
+    std::cout << QString("生成された乱数 : この値を取得したニュース記事群の配列のインデックス値とする : %1").arg(randomValue).toStdString() << std::endl << std::endl;
 #endif
 
     return m_BeforeWritingArticles.at(randomValue);
@@ -2166,6 +2564,96 @@ int Runner::getDatafromWrittenLog()
         Article article(obj["title"].toString(), obj["paragraph"].toString(), obj["url"].toString(), obj["date"].toString());
         m_WrittenArticles.append(article);
     }
+
+    return 0;
+}
+
+
+// 書き込むスレッドのレス数が上限に達しているかどうかを確認
+int Runner::checkLastThreadNum()
+{
+    HtmlFetcher fetcher(this);
+    if (fetcher.fetchLastThreadNum(QUrl(m_ThreadURL), true, m_ThreadXPath, XML_TEXT_NODE)) {
+        /// 最後尾のレス番号の取得に失敗した場合
+        return -1;
+    }
+    auto element = fetcher.GetElement();
+
+    bool ok;
+    auto max = element.toInt(&ok);
+    if (!ok) {
+        return -1;
+    }
+
+    // スレッドのレス数が上限に達したかどうかを確認
+    if (max >= m_maxThreadNum) {
+        // 上限に達している場合
+        return 1;
+    }
+
+    return 0;
+}
+
+
+// スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+int Runner::UpdateThreadJson()
+{
+    // 設定ファイルの読み込み
+    QFile File(m_SysConfFile);
+    if (!File.open(QIODevice::ReadOnly)) {
+        std::cerr << QString("エラー : 設定ファイルのオープンに失敗 %1").arg(m_SysConfFile).toStdString() << std::endl;
+        return -1;
+    }
+
+    QJsonDocument doc;
+    try {
+        // 設定ファイルの内容を読み込む
+        doc = QJsonDocument::fromJson(File.readAll());
+    }
+    catch(QException &ex) {
+        File.close();
+
+        std::cerr << QString("エラー : %1").arg(ex.what()).toStdString() << std::endl;
+        return -1;
+    }
+
+    // 設定ファイルを閉じる
+    File.close();
+
+    if (!doc.isObject()) {
+        std::cerr << QString("エラー : 設定ファイルがオブジェクトではありません").toStdString() << std::endl;
+        return -1;
+    }
+
+    QJsonObject obj = doc.object();
+
+    // 設定ファイルの"thread"オブジェクトにある"key"および"threadurl"を更新
+    QJsonObject threadObj   = obj.value("thread").toObject();
+    threadObj["key"]        = m_ThreadInfo.key;
+    threadObj["threadurl"]  = m_ThreadURL;
+    obj["thread"]           = threadObj;
+
+    doc.setObject(obj);
+
+    // 更新されたJSONオブジェクトをファイルに書き戻す
+    if (!File.open(QIODevice::WriteOnly)) {
+        std::cerr << QString("エラー : 設定ファイルのオープンに失敗 %1").arg(m_SysConfFile).toStdString() << std::endl;
+        return -1;
+    }
+
+    // 設定ファイルを更新
+    try {
+        File.write(doc.toJson());
+    }
+    catch(QException &ex) {
+        File.close();
+
+        std::cerr << QString("エラー : %1").arg(ex.what()).toStdString() << std::endl;
+        return -1;
+    }
+
+    // 設定ファイルを閉じる
+    File.close();
 
     return 0;
 }

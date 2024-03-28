@@ -23,7 +23,7 @@ struct THREAD_INFO
                                  QString _bbs, QString _time, QString _key) :
                                  subject(std::move(_subject)), from(std::move(_from)), mail(std::move(_mail)), bbs(std::move(_bbs)),
                                  message(std::move(_message)), time(std::move(_time)), key(std::move(_key)) {}
-    QString subject     = "";   // スレッドタイトル名 (スレッドを立てる場合のみ入力)
+    QString subject     = "";   // スレッドのタイトル (スレッドを新規作成する場合のみ入力)
     QString from        = "";
     QString mail        = "";   // メール欄
     QString message     = "";   // 書き込む内容

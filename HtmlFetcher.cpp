@@ -1,22 +1,58 @@
+#include <QTextCodec>
 #include <iostream>
 #include <regex>
 #include "HtmlFetcher.h"
 
 
-HtmlFetcher::HtmlFetcher(QObject *parent) : QObject{parent}
+HtmlFetcher::HtmlFetcher(QObject *parent) : m_pManager(std::make_unique<QNetworkAccessManager>(this)), QObject{parent}
 {
 
 }
 
 
 HtmlFetcher::HtmlFetcher(long long maxParagraph, QObject *parent) : m_MaxParagraph(maxParagraph),
-    m_pManager(std::make_unique<QNetworkAccessManager>(this)) , QObject{parent}
+    m_pManager(std::make_unique<QNetworkAccessManager>(this)), QObject{parent}
 {
 
 }
 
 
 HtmlFetcher::~HtmlFetcher() = default;
+
+
+// 指定されたURLが存在するかどうかを確認する
+bool HtmlFetcher::checkUrlExistence(const QUrl &url)
+{
+    QNetworkAccessManager *manager = new QNetworkAccessManager();
+
+    // HEADリクエストの作成
+    QNetworkRequest request(url);
+
+    // リダイレクトの無効
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, false);
+
+    // HEADを取得
+    QNetworkReply *pReply = manager->get(request);
+
+    // レスポンス待機
+    QEventLoop loop;
+    QObject::connect(pReply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    // レスポンスの確認
+    if (pReply->error() == QNetworkReply::NoError) {
+        // ステータスコードの確認
+        int statusCode = pReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (statusCode == 200) {
+            pReply->deleteLater();
+            return true;
+        }
+    }
+
+    pReply->deleteLater();
+
+    return false;
+}
 
 
 // ニュース記事のURLにアクセスして、本文を取得する
@@ -137,6 +173,169 @@ xmlXPathObjectPtr HtmlFetcher::getNodeset(xmlDocPtr doc, const xmlChar *xpath)
 }
 
 
+// ニュース記事のURLにアクセスして、XPathで指定した値を取得する
+int HtmlFetcher::fetchElement(const QUrl &url, bool redirect, const QString &_xpath, int elementType)
+{
+    // リダイレクトを自動的にフォロー
+    QNetworkRequest request(url);
+
+    if (redirect) {
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, true);
+    }
+
+    auto pReply = m_pManager->get(request);
+
+    // レスポンス待機
+    QEventLoop loop;
+    QObject::connect(pReply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    // レスポンスの取得
+    if (pReply->error() != QNetworkReply::NoError) {
+        std::cerr << QString("エラー : %1").arg(pReply->errorString()).toStdString() << std::endl;
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    QString htmlContent = pReply->readAll();
+
+    // libxml2の初期化
+    xmlInitParser();
+    LIBXML_TEST_VERSION
+
+    // 文字列からHTMLドキュメントをパース
+    // libxml2ではエンコーディングの自動判定において問題があるため、エンコーディングを明示的に指定する
+    xmlDocPtr doc = htmlReadDoc((const xmlChar*)htmlContent.toStdString().c_str(), nullptr, "UTF-8", HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+    if (doc == nullptr) {
+        std::cerr << QString("エラー : HTMLドキュメントのパースに失敗").toStdString() << std::endl;
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    // XPathで特定の要素を検索
+    auto *xpath = xmlStrdup((const xmlChar*)_xpath.toUtf8().constData());
+    xmlXPathObjectPtr result = getNodeset(doc, xpath);
+    if (result == nullptr) {
+        std::cerr << QString("エラー : ノードの取得に失敗").toStdString() << std::endl;
+        xmlFreeDoc(doc);
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    // 結果のノードセットからテキストを取得
+    m_Element.clear();
+    xmlNodeSetPtr nodeset = result->nodesetval;
+    for (auto i = 0; i < nodeset->nodeNr; ++i) {
+        xmlNodePtr cur = nodeset->nodeTab[i]->xmlChildrenNode;
+        while (cur != nullptr) {
+            if (cur->type == elementType) {
+                auto buffer = QString(((const char*)cur->content)) + QString(" ");
+                m_Element.append(buffer);
+            }
+            cur = cur->next;
+        }
+    }
+
+    // libxml2オブジェクトの破棄
+    xmlXPathFreeObject(result);
+    xmlFreeDoc(doc);
+
+    // libxml2のクリーンアップ
+    xmlCleanupParser();
+
+    pReply->deleteLater();
+
+    return 0;
+}
+
+
+// 書き込むスレッドの最後尾のレス番号を取得する
+int HtmlFetcher::fetchLastThreadNum(const QUrl &url, bool redirect, const QString &_xpath, int elementType)
+{
+    // リダイレクトを自動的にフォロー
+    QNetworkRequest request(url);
+
+    if (redirect) {
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, true);
+    }
+
+    auto pReply = m_pManager->get(request);
+
+    // レスポンス待機
+    QEventLoop loop;
+    QObject::connect(pReply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    // レスポンスの取得
+    if (pReply->error() != QNetworkReply::NoError) {
+        std::cerr << QString("エラー : %1").arg(pReply->errorString()).toStdString() << std::endl;
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    QString htmlContent = pReply->readAll();
+
+    // libxml2の初期化
+    xmlInitParser();
+    LIBXML_TEST_VERSION
+
+    // 文字列からHTMLドキュメントをパース
+    // libxml2ではエンコーディングの自動判定において問題があるため、エンコーディングを明示的に指定する
+    xmlDocPtr doc = htmlReadDoc((const xmlChar*)htmlContent.toStdString().c_str(), nullptr, "UTF-8", HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+    if (doc == nullptr) {
+        std::cerr << QString("エラー : HTMLドキュメントのパースに失敗").toStdString() << std::endl;
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    // XPathで特定の要素を検索
+    auto *xpath = xmlStrdup((const xmlChar*)_xpath.toUtf8().constData());
+    xmlXPathObjectPtr result = getNodeset(doc, xpath);
+    if (result == nullptr) {
+        std::cerr << QString("エラー : ノードの取得に失敗").toStdString() << std::endl;
+        xmlFreeDoc(doc);
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    // 結果のノードセットからテキストを取得
+    m_Element.clear();
+    xmlNodeSetPtr nodeset = result->nodesetval;
+//    for (auto i = 0; i < nodeset->nodeNr; ++i) {
+//        xmlNodePtr cur = nodeset->nodeTab[i]->xmlChildrenNode;
+//        while (cur != nullptr) {
+//            if (cur->type == elementType) {
+//                auto buffer = QString(((const char*)cur->content)) + QString(" ");
+//                m_Element.append(buffer);
+//            }
+//            cur = cur->next;
+//        }
+//    }
+    xmlNodePtr cur = nodeset->nodeTab[nodeset->nodeNr - 1]->xmlChildrenNode;
+    if (cur->type == elementType) {
+        auto buffer = QString(((const char*)cur->content));
+        m_Element.append(buffer);
+    }
+
+    // libxml2オブジェクトの破棄
+    xmlXPathFreeObject(result);
+    xmlFreeDoc(doc);
+
+    // libxml2のクリーンアップ
+    xmlCleanupParser();
+
+    pReply->deleteLater();
+
+    return 0;
+}
+
+
 // 新規作成したスレッドからスレッドのパスおよびスレッド番号を取得する
 int HtmlFetcher::extractThreadPath(const QString &htmlContent, const QString &bbs)
 {
@@ -171,10 +370,10 @@ int HtmlFetcher::extractThreadPath(const QString &htmlContent, const QString &bb
 
             /// 次に、抽出したURLの部分からスレッドのパスを抽出
             /// 正規表現パターン : 最後の "/" 以前を取得する
-            static QRegularExpression re2("^(.+/)[^/]+");
-            QRegularExpressionMatch match = re2.match(url);
-            if (match.hasMatch()) {
-                m_ThreadPath = match.captured(1);
+            static QRegularExpression regExThreadPath("^(.+/)[^/]+");
+            QRegularExpressionMatch MatchThreadPath = regExThreadPath.match(url);
+            if (MatchThreadPath.hasMatch()) {
+                m_ThreadPath = MatchThreadPath.captured(1);
 
 #ifdef _DEBUG
                 std::cout << QString("スレッドのパス : %1").arg(m_ThreadPath).toStdString() << std::endl;
@@ -182,18 +381,29 @@ int HtmlFetcher::extractThreadPath(const QString &htmlContent, const QString &bb
             }
 
             /// さらに、抽出したURLの部分からスレッド番号を抽出
-            auto urlStr = url.toStdString();
-            QString RegStr = QString("/[^/]+/%1/([^/]+)/").arg(bbs);
-            std::regex re3(RegStr.toStdString());
-            std::smatch ThreadNumMatch;
-            if (std::regex_search(urlStr, ThreadNumMatch, re3) && ThreadNumMatch.size() > 1) {
-                // スレッド番号を取得
-                m_ThreadNum = ThreadNumMatch[1].str().c_str();
+            static QRegularExpression regExThreadNum(QString("/%1/([^/]+)/").arg(bbs));
+            QRegularExpressionMatch MatchThreadNum = regExThreadNum.match(url);
+            if (MatchThreadNum.hasMatch()) {
+                m_ThreadNum = MatchThreadNum.captured(1);
 
 #ifdef _DEBUG
-                std::cout << QString("スレッド番号 : %1").arg(m_ThreadNum).toStdString() << std::endl;
+                std::cout << "スレッド番号 : " << m_ThreadNum.toStdString() << std::endl;
 #endif
             }
+
+            /// さらに、抽出したURLの部分からスレッド番号を抽出 (C++標準ライブラリを使用する場合)
+            /// デッドコードではあるが、処理をコメントアウトして一時的に保存する
+//            auto urlStr = url.toStdString();
+//            std::regex regExThreadNum(QString("/[^/]+/%1/([^/]+)/").arg(bbs).toStdString());
+//            std::smatch ThreadNumMatch;
+//            if (std::regex_search(urlStr, ThreadNumMatch, regExThreadNum) && ThreadNumMatch.size() > 1) {
+//                // スレッド番号を取得
+//                m_ThreadNum = ThreadNumMatch[1].str().c_str();
+
+//#ifdef _DEBUG
+//                std::cout << "スレッド番号 : " << m_ThreadNum.toStdString() << std::endl;
+//#endif
+//            }
         }
     }
 

@@ -10,13 +10,18 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 
 現在対応しているニュースサイトは、以下の通りです。  
 
-* News API (無料版のNews APIはニュース記事が1日遅れのため、デフォルトでは無効)  
+* News API  
+  ただし、無料版のNews APIはニュース記事が1日遅れのため、デフォルトでは無効です。  
+  有料版で最も安いプランであるNews APIビジネスについては、月額$449となっております。
 * 時事ドットコム  
 * 共同通信  
-* 朝日新聞デジタル (ただし、フィードに掲載されている記事には有料記事が多い)  
+* 朝日新聞デジタル  
+  ただし、RSSフィードに掲載されている記事には有料記事が多いです。  
 * CNET Japan  
 * ハンギョレ新聞  
-* ロイター通信
+* ロイター通信  
+* 東京新聞  
+  XPath式を使用してニュース記事を取得しています。  
 
 <br>
 
@@ -25,13 +30,18 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 <br>
 
 README.mdでは、Red Hat Enterprise LinuxおよびSUSE Linux Enterprise / openSUSEを前提に記載しております。  
-また、他のLinuxディストリビューションにもインストールして使用できると思います。(Raspberry Pi上での動作は確認済みです)  
-(例: Linux Mint, Manjaro, MX Linux, ... 等)  
+また、他のLinuxディストリビューションにもインストールして使用できると思います。  
+(例 : Linux Mint, Manjaro, MX Linux, ... 等)  
+
+Raspberry Pi上での動作は確認済みです。  
 <br>
 
 **注意：**  
-**version 0.1.0から試験的ですが、掲示板等に書き込めるようになりました。**  
+**version 0.1.0以降、0ch系の掲示板に書き込めるようになりました。**  
 **ただし、新規スレッドを立てる機能はありませんのでご注意ください。**  
+
+**新規スレッドを自動的に作成する機能は、version 0.3.0以降に導入する予定です。**  
+**この機能は、ニュース記事を書き込んでいるスレッドのレス数が上限に達した時にスレッドを新規作成するものです。**  
 
 **また、ご要望があれば、逐次開発を進めていく予定です。**  
 <br>
@@ -243,14 +253,77 @@ qnewsflash.serviceファイルを開いて、<code>[Service]</code>セクショ�
 # 3. ラッパーシェルスクリプト - qNewsFlash.shファイル
 
 このソフトウェアには、Qt 5ライブラリが同梱されております。  
-もし、Qt 5ライブラリがインストールできない環境でも、ラッパーシェルスクリプトを実行することにより、ソフトウェアを動作させることができる可能性があります。  
+もし、VPSやレンタルサーバにQt 5ライブラリがインストールできない環境でも、同梱しているライブラリとラッパーシェルスクリプトを実行することにより、  
+ソフトウェアを動作させることができる可能性があります。  
 <br>
 
 なお、qNewsFlash.shファイルは、qNewsFlashファイルと同階層のディレクトリにインストールされております。  
 デフォルトでは、<I>**/usr/local/bin**</I> ディレクトリにインストールされます。  
 <br>
 
-qNewsFlash.shファイルの内容を以下に示します。  
+手順は、以下の通りです。  
+<br>
+
+## 3.1. 仮想マシンの準備
+まず、使用する予定のサーバと同じバージョンのLinuxディストリビューションを仮想マシンにインストールします。  
+<br>
+
+## 3.2. Qt 5 SDKのインストール (仮想マシン上)
+次に、仮想マシン上でQtオンラインインストーラをダウンロードします。  
+
+    wget http://download.qt.io/official_releases/online_installers/qt-unified-linux-x64-online.run
+<br>
+
+仮想マシン上でQtオンラインインストーラに実行権限を付与して実行します。  
+
+    chmod +x qt-unified-linux-x64-online.run
+    ./qt-unified-linux-x64-online.run
+<br>
+
+Qtアカウントとパスワードを入力して、[次へ]ボタンを押下します。  
+もし、アカウントを持っていない場合は、下図の①を選択してアカウントを作成してください。  
+<center><img src="HC/Qt_SDK_Install_1.png" width="50%" /></center>  
+<br>
+
+次の画面で、[コンポーネントの追加または削除]を選択して、[次へ]ボタンを押下します。  
+<center><img src="HC/Qt_SDK_Install_2.png" width="50%" /></center>  
+<br>
+
+下図のように、[Qt 5.15.2]の[Desktop gcc 64-bit]のみを選択して、Qt 5 SDKをインストールします。  
+インストールにはしばらくの時間を要します。
+<center><img src="HC/Qt_SDK_Install_3.png" width="50%" /></center>  
+<br>
+
+## 3.3. qNewsFlashのビルドおよびインストール (仮想マシン上)
+インストールしたQt 5 SDKを使用して、本ソフトウェアをビルドおよびインストールします。  
+
+同梱しているQt 5ライブラリは、デフォルトでは<I>**/usr/local/(lib | lib64)/Qt**</I> ディレクトリにインストールされます。  
+
+    # パスの設定  
+    export PATH="/<Qt 5 SDKのインストールディレクトリ>/5.15.2/gcc_64/bin:$PATH"  
+    export LD_LIBRARY_PATH="/<Qt 5 SDKのインストールディレクトリ>/5.15.2/gcc_64/lib:$LD_LIBRARY_PATH"  
+    export PKG_CONFIG_PATH="/<Qt 5 SDKのインストールディレクトリ>/5.15.2/gcc_64/lib/pkgconfig:$(pkg-config --variable pc_path pkg-config)"  
+
+    # 本ソフトウェアのビルドおよびインストール  
+    cmake -DCMAKE_BUILD_TYPE=Release \  
+          -DCMAKE_INSTALL_PREFIX=<qNewsFlashのインストールディレクトリ> \  
+          -DSYSCONF_DIR=<設定ファイルのインストールディレクトリ>          \    
+          -DSYSTEMD=<任意の設定>     \  
+          -DPID=<任意のディレクトリ>  \  
+          ..  
+    
+    make -j $(nproc)  
+    
+    make install  または  sudo make install  
+<br>
+
+## 3.4. VPSやレンタルサーバへアップロード
+インストールした本ソフトウェアおよびQt 5ライブラリ (同梱しているもの) をVPSやレンタルサーバへアップロードします。  
+<br>
+
+## 3.5. ラッパーシェルスクリプトの編集 (サーバ上)
+qNewsFlash.shファイルの内容を編集して、環境変数<code>LD_LIBRARY_PATH</code>の設定を変更します。  
+**<u><同梱しているQt 5ライブラリをアップロードしたディレクトリ></u>** を各自のパスに変更してください。  
 
     #!/usr/bin/env sh
 
@@ -267,17 +340,13 @@ qNewsFlash.shファイルの内容を以下に示します。
     cd $dirname
 
     # Qt 5ライブラリのパスを環境変数LD_LIBRARY_PATHに追加
-    export LD_LIBRARY_PATH="/<qNewsFlashのインストールディレクトリ>/<lib | lib64>/Qt:$LD_LIBRARY_PATH"
+    export LD_LIBRARY_PATH="<同梱しているQt 5ライブラリをアップロードしたディレクトリ>:$LD_LIBRARY_PATH"
 
     # qNewsFlashの実行
     "$dirname/$appname" "$@" 
 <br>
 
-同梱しているQt 5ライブラリは、デフォルトでは<I>**/usr/local/(lib | lib64)/Qt**</I> ディレクトリにインストールされます。  
-
-必要であれば、ユーザ自身がQt 5ライブラリを任意のディレクトリに配置して、環境変数<code>LD_LIBRARY_PATH</code>の値を変更することもできます。  
-<br>
-
+## 3.6. 本ソフトウェアの実行 (サーバ上)
 qNewsFlash.shを実行します。  
 qNewsFlashが正常に実行できるかどうかを確認してください。  
 
@@ -288,8 +357,7 @@ qNewsFlashが正常に実行できるかどうかを確認してください。
 
 Systemdサービスを使用する場合は、<I>**ExecStart**</I> キーの値も変更します。  
 
-
-<code>ExecStart=/<qNewsFlashのインストールディレクトリ>/bin/qNewsFlash.sh --sysconf=<qNewsFlash.jsonのパス></code>
+    ExecStart=/<qNewsFlashのインストールディレクトリ>/bin/qNewsFlash.sh --sysconf=<qNewsFlash.jsonのパス>
 
 <br>
 <br>
@@ -352,6 +420,57 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   ロイター通信からニュースを取得するかどうかを指定します。  
   デフォルトは無効です。  
   <br>
+* tokyonp  
+  * enable  
+    デフォルト値 : <code>false</code>  
+    東京新聞からニュースを取得するかどうかを指定します。  
+    デフォルトは無効です。  
+    <br>
+  * toppage  
+    デフォルト値 : <code>"https://www.tokyo-np.co.jp"</code>  
+    東京新聞では、トップページのURLを基準にニュース記事が存在します。  
+    もし、この基準が変更された場合は、この値を変更します。  
+    <br>
+  * fetchurl  
+    デフォルト値 : <code>"https://www.tokyo-np.co.jp"</code>  
+    ニュース記事の種類を決定するURLを指定します。  
+    デフォルト値は、総合ニュースのURLです。  
+    例えば、政治ニュースの記事を取得する場合は、"https://www.tokyo-np.co.jp/n/politics" を指定します。  
+    <br>
+  * topxpath  
+    デフォルト値 : <code>"/html/body/div[1]/div[2]/main/div/div[1]/div/div[3]/div[1]/div/div[contains(@class, 'thumb')]/a/@href"</code>  
+    **<u>総合ニュースを取得する場合</u>**、ヘッドラインニュースを取得するXPath式を指定します。  
+    <br>
+    2024年3月現在、総合ニュースからヘッドラインニュースを取得する完全なXPath式は、以下の通りです。  
+    <code>/html/body/div[@id='document']/div[@id='document-wrapper']//main[contains(@class, 'main-container')]//div[contains(@class, 'content-area')]//div[contains(@class, 'l-wrapper')]//div[contains(@class, 'l-container')]//div[contains(@class, 'cmp-m-catelst002')]//div[contains(@class, 'cmp-thmb001 pt-20 pb-20')]//div[contains(@class, 'wrp lv2')]//div[contains(@class, 'thumb')]/a/@href</code>  
+    <br>
+    **※1**  
+    **ヘッドラインニュースを取得しない場合は、この値を空欄にしてください。**  
+    <br>
+    **※2**  
+    **また、政治ニュース等の総合ニュースではない記事を取得する場合も空欄にしてください。**  
+    <br>
+    **※3**  
+    **ただし、Webサイトの構成が変更された場合は、それに合わせてこの値を変更する必要があります。**  
+    <br>
+  * newsxpath  
+    デフォルト値 : <code>"/html/body/div[1]/div[2]/main/div/div[1]/div/div[3]/div[4]/div/ul/li/div[contains(@class, 'cmp-thmb001 js-link')]/@data-href"</code>  
+    各ニュース記事を取得するXPath式を指定します。  
+    デフォルト値は、総合ニュースからヘッドライン以外の記事を取得するXPath式となっております。  
+    <br>
+    2024年3月現在、総合ニュースからヘッドライン以外の記事を取得する完全なXPath式は、以下の通りです。  
+    <code>/html/body/div[@id='document']/div[@id='document-wrapper']//main[contains(@class, 'main-container')]//div[contains(@class, 'content-area')]//div[contains(@class, 'l-wrapper')]//div[contains(@class, 'l-container')]//div[contains(@class, 'cmp-m-catelst002')]//div[contains(@class, 'cmp-lst001 col-2 reverse')]//div[contains(@class, 'l-artlst001')]//ul[contains(@class, 'list')]//li[contains(@class, 'item')]//div[contains(@class, 'cmp-thmb001 js-link')]/@data-href</code>  
+    <br>
+    **※  ただし、Webサイトの構成が変更された場合は、それに合わせてこの値を変更する必要があります。**  
+    <br>
+  * jsonpath  
+    デフォルト値 : <code>"/html/head/script[@type='application/ld+json']"</code>  
+    各ニュース記事のheadタグには、記事に関する多くの情報が埋め込まれています。  
+    その中から、タイトル・記事の概要・URL・公開日を取得する時に使用するXPath式を指定します。  
+    <br>
+    **※  ただし、Webサイトの構成が変更された場合は、それに合わせてこの値を変更する必要があります。**  
+    <br>
+  <br>
 * autofetch  
   デフォルト値 : <code>true</code>  
   タイマ (<code>interval</code>キーの値を使用) を使用して、ニュース記事を自動取得するかどうかを指定します。  
@@ -411,7 +530,11 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   デフォルト値 : 空欄  
   ニュース記事を書き込むため、POSTデータを送信するURLを指定します。  
   <br>
-  0ch系の場合は、<code>**http(s)://<ドメイン名>/test/bbs.cgi?guid=ON**</code> の場合が多いです。  
+  0ch系の場合は、以下に示す場合が多いです。  
+  * <code>**http(s)://<ドメイン名>/test/bbs.cgi**</code>  
+  * <code>**http(s)://<ドメイン名>/test/bbs.cgi?guid=ON**</code>  
+  <br>
+
   書き込み時に必須です。  
   <br>
 * subject  

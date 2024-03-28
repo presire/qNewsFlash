@@ -66,8 +66,8 @@ int Poster::PostforWriteThread(const QUrl &url, THREAD_INFO &ThreadInfo)
         // UTF-8用 (QUrlQueryクラスはShift-JISに非対応)
         QUrlQuery query;
 
-        query.addQueryItem("subject",   ThreadInfo.subject);    // スレッドタイトル名 (スレッドに書き込む場合は空欄にする)
-        query.addQueryItem("FROM",      ThreadInfo.from);
+        query.addQueryItem("subject",   "");                    // スレッドのタイトル (スレッドに書き込む場合は空欄にする)
+        query.addQueryItem("FROM",      ThreadInfo.from);       // 名前欄
         query.addQueryItem("mail",      ThreadInfo.mail);       // メール欄
         query.addQueryItem("MESSAGE",   ThreadInfo.message);    // 書き込む内容
         query.addQueryItem("bbs",       ThreadInfo.bbs);        // BBS名
@@ -80,7 +80,7 @@ int Poster::PostforWriteThread(const QUrl &url, THREAD_INFO &ThreadInfo)
         // Shift-JIS用
         QString postMessage = QString("subject=%1&FROM=%2&mail=%3&MESSAGE=%4&bbs=%5&time=%6&key=%7")
                                   .arg(ThreadInfo.subject,  // スレッドのタイトル (スレッドに書き込む場合は空欄にする)
-                                       ThreadInfo.from,
+                                       ThreadInfo.from,     // 名前欄
                                        ThreadInfo.mail,     // メール欄
                                        ThreadInfo.message,  // 書き込む内容
                                        ThreadInfo.bbs,      // BBS名
@@ -133,8 +133,8 @@ int Poster::PostforCreateThread(const QUrl &url, THREAD_INFO &ThreadInfo)
         // UTF-8用 (QUrlQueryクラスはShift-JISに非対応)
         QUrlQuery query;
 
-        query.addQueryItem("subject",   ThreadInfo.subject);    // スレッドタイトル名 (スレッドを立てる場合は入力する)
-        query.addQueryItem("FROM",      ThreadInfo.from);
+        query.addQueryItem("subject",   ThreadInfo.subject);    // スレッドのタイトル (スレッドを新規作成する場合は入力する)
+        query.addQueryItem("FROM",      ThreadInfo.from);       // 名前欄
         query.addQueryItem("mail",      ThreadInfo.mail);       // メール欄
         query.addQueryItem("MESSAGE",   ThreadInfo.message);    // 書き込む内容
         query.addQueryItem("bbs",       ThreadInfo.bbs);        // BBS名
@@ -146,7 +146,7 @@ int Poster::PostforCreateThread(const QUrl &url, THREAD_INFO &ThreadInfo)
         // Shift-JIS用
         QString postMessage = QString("subject=%1&FROM=%2&mail=%3&MESSAGE=%4&bbs=%5&time=%6")
                                   .arg(ThreadInfo.subject,  // スレッドのタイトル (スレッドを立てる場合のみ入力)
-                                       ThreadInfo.from,
+                                       ThreadInfo.from,     // 名前欄
                                        ThreadInfo.mail,     // メール欄
                                        ThreadInfo.message,  // 書き込む内容
                                        ThreadInfo.bbs,      // BBS名

@@ -29,6 +29,14 @@
     "reuters": true,
     "shiftjis": true,
     "subject": "",
+    "tokyonp": {
+        "enable": false,
+        "jsonpath": "/html/head/script[@type='application/ld+json']",
+        "newsxpath": "/html/body/div[1]/div[2]/main/div/div[1]/div/div[3]/div[4]/div/ul/li/div[contains(@class, 'cmp-thmb001 js-link')]/@data-href",
+        "toppage": "https://www.tokyo-np.co.jp",
+        "topxpath": "/html/body/div[1]/div[2]/main/div/div[1]/div/div[3]/div[1]/div/div[contains(@class, 'thumb')]/a/@href",
+        "url": "https://www.tokyo-np.co.jp"
+    },
     "update": "",
     "withinhours": "0",
     "writefile": ""
