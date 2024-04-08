@@ -301,7 +301,7 @@ int HtmlFetcher::fetchElementJiJiFlashUrl(const QUrl &url, bool redirect, const 
         xmlCleanupParser();
         pReply->deleteLater();
 
-        return -1;
+        return 0;
     }
 
     // 結果のノードセットからテキストを取得

@@ -88,8 +88,8 @@ int JiJiFlash::FetchFlash()
     auto origLink = fetcher.GetElement();
 
     /// リンクが存在するかどうかを確認
-    if (origLink.isEmpty()) {
-        /// リンクが存在しない場合
+    if (!origLink.isEmpty()) {
+        /// リンクが存在する場合
         return -1;
     }
 
