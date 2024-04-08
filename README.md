@@ -14,9 +14,12 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
   ただし、無料版のNews APIはニュース記事が1日遅れのため、デフォルトでは無効です。  
   有料版で最も安いプランであるNews APIビジネスについては、月額$449となっております。
 * 時事ドットコム  
+* 時事ドットコム (速報ニュース)  
+  XPath式を使用して速報ニュースを取得しています。  
+  <u>速報ニュースは、他のニュース記事とは別に書き込みされます。</u>  
 * 共同通信  
 * 朝日新聞デジタル  
-  ただし、RSSフィードに掲載されている記事には有料記事が多いです。  
+  ただし、RSSフィードに掲載されている記事には有料記事が多いため、デフォルトでは無効です。  
 * CNET Japan  
 * ハンギョレ新聞  
 * ロイター通信  
@@ -213,13 +216,16 @@ Systemdサービスを使用せずに、qNewsFlashを実行することもでき
 Cronを使用して本ソフトウェアを連携する場合は、設定ファイルの<code>autofetch</code>を<code>false</code>に設定して、ワンショット機能を有効にします。  
 <br>
 
-以下は、Crontabファイルを編集して、7:00から22:00まで1時間ごとに本ソフトウェアを実行する設定例です。  
+以下は、7:00から22:00まで1時間ごとに本ソフトウェアを実行する設定例です。  
+また、時事ドットコムから速報記事を7:00から22:00まで10分ごとに取得しています。  
+
 この例では、本ソフトウェアは/usr/local/bin/qNewsFlashにインストールされています。  
 
     sudo crontab -e  
 <br>
 
-    0 7-22 * * * /usr/local/bin/qNewsFlash --sysconf=<qNewsFlash.jsonのパス>  
+    0    7-22 * * * /usr/local/bin/qNewsFlash --sysconf=/tmp/qNewsFlash.json  
+    */10 7-22 * * * /usr/local/bin/qNewsFlash --sysconf=/tmp/JiJiFlashOnly.json  
 <br>
 
 ## 2.5 ワンショット機能とSystemdサービス
@@ -250,7 +256,7 @@ qnewsflash.serviceファイルを開いて、<code>[Service]</code>セクショ�
 <br>
 
 
-# 3. ラッパーシェルスクリプト - qNewsFlash.shファイル
+# 3. ラッパーシェルスクリプトの使用方法 - qNewsFlash.shファイル
 
 このソフトウェアには、Qt 5ライブラリが同梱されております。  
 もし、VPSやレンタルサーバにQt 5ライブラリがインストールできない環境でも、同梱しているライブラリとラッパーシェルスクリプトを実行することにより、  
@@ -471,6 +477,56 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
     **※  ただし、Webサイトの構成が変更された場合は、それに合わせてこの値を変更する必要があります。**  
     <br>
   <br>
+* jijiflash  
+  * enable  
+    デフォルト値 : <code>false</code>  
+    時事通信から速報ニュースを取得するかどうかを指定します。  
+    速報ニュースは、他のニュース記事とは別に書き込みされます。  
+    デフォルトは無効です。  
+    <br>
+  * interval  
+    デフォルト値 : <code>"600"</code>  
+    時事ドットコムから速報ニュースを取得する時間間隔 (秒) を指定します。  
+    デフォルト値は600[秒] (10分間隔で速報ニュースを取得) です。  
+    <br>
+    0を指定した場合は、強制的に600[秒] (10[分]) に指定されます。  
+    60秒未満 (1[分]未満) を指定した場合は、強制的に60[秒] (1[分]) に指定されます。  
+    0未満の値が指定された場合はエラーとなり、本ソフトウェアを終了します。  
+    <br>
+  * basisurl  
+    デフォルト値 : <code>"https://www.jiji.com"</code>  
+    時事ドットコムでは、トップページのURLを基準にニュース記事が存在します。  
+    もし、この基準が変更された場合は、この値を変更します。  
+    <br>
+  * flashurl  
+    デフォルト値 : <code>"https://www.jiji.com/jc/list?g=flash"</code>  
+    時事ドットコムから速報ニュースが存在するURLを指定します。  
+    デフォルト値は、全ての速報ニュースが存在するURLです。  
+    例えば、当日のみの速報ニュースを取得する場合は、"https://www.jiji.com/jc/list?g=flash&d=date1" を指定します。  
+    <br>
+  * flashxpath  
+    デフォルト値 : <code>"/html/body/div[@id='Contents']/div[@id='ContentsInner']/div[@id='Main']/div[contains(@class, 'MainInner mb30')]/div[contains(@class, 'ArticleListMain')]/ul[@class='LinkList']/li[1]/a/@href"</code>  
+    上記の<code>flashurl</code>に指定したURLから、公開日の最も新しい速報ニュースのURLを1件のみ取得するXPath式を指定します。  
+    <br>
+  * titlexpath  
+    デフォルト値 : <code>"/html/head/meta[@name='title']/@content"</code>  
+    上記の<code>flashxpath</code>で取得した速報ニュースのURLからタイトルを取得するXPath式を指定します。  
+    <br>
+  * paraxpath  
+    デフォルト値 : <code>"/html/head/meta[@name='description']/@content"</code>  
+    上記の<code>flashxpath</code>で取得した速報ニュースのURLから本文を取得するXPath式を指定します。  
+    <br>
+  * pubdatexpath  
+    デフォルト値 : <code>"/html/head/meta[@name='pubdate']/@content"</code>  
+    上記の<code>flashxpath</code>で取得した速報ニュースのURLから公開日を取得するXPath式を指定します。  
+    <br>
+  * urlxpath  
+    デフォルト値 : <code>"/html/body/div[@id='Contents']/div[@id='ContentsInner']/div[@id='Main']/div[contains(@class, 'MainInner Individual')]/article/div[contains(@class, 'ArticleText clearfix')]/p[@class='ArticleTextTab']"</code>  
+    上記の<code>flashxpath</code>で取得した速報ニュースのURLから、"<この速報の記事を読む>"の部分のリンクを取得するXPath式を指定します。  
+    <br>
+    このリンクが存在する場合は本記事が存在すると看做します。  
+    つまり、本記事が存在する場合は速報記事ではないものとします。  
+    <br>
 * autofetch  
   デフォルト値 : <code>true</code>  
   タイマ (<code>interval</code>キーの値を使用) を使用して、ニュース記事を自動取得するかどうかを指定します。  
@@ -643,17 +699,17 @@ qEQAlertプロジェクトのGitHub : https://github.com/presire/qEQAlert
 
 **この設定ファイルは、qNewsFlash 0.1.0以降 使用されておりませんのでご注意ください。**  
 
-上記のセクションでも記載した通り、  
-このソフトウェアは、各ニュースサイトからニュース記事を複数取得して、その複数のニュース記事から自動的に1つのみを選択します。  
-このファイルは、その選択された(書き込み用)1つのニュース記事の情報が記載されています。 
+<del>上記のセクションでも記載した通り、</del>  
+<del>このソフトウェアは、各ニュースサイトからニュース記事を複数取得して、その複数のニュース記事から自動的に1つのみを選択します。</del>  
+<del>このファイルは、その選択された(書き込み用)1つのニュース記事の情報が記載されています。</del>  
 <br>
 
-記事の更新のタイミングにより、ファイル内容は上書きされます。  
+<del>記事の更新のタイミングにより、ファイル内容は上書きされます。</del>  
 
-ユーザは、このファイルを利用して掲示板等に自動的に書き込むようなスクリプトを作成することができます。  
+<del>ユーザは、このファイルを利用して掲示板等に自動的に書き込むようなスクリプトを作成することができます。</del>  
 <br>
 
-また、設定ファイルにより、このファイル名およびファイルのパスを自由に変更することができます。  
+<del>また、設定ファイルにより、このファイル名およびファイルのパスを自由に変更することができます。</del>  
 <br>
 
 このファイルは、以下に示すようなフォーマットになっています。  

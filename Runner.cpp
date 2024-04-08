@@ -25,7 +25,6 @@ Runner::Runner(QStringList _args, QString user, QObject *parent) : m_args(std::m
     manager(std::make_unique<QNetworkAccessManager>(this)),
     QObject{parent}
 {
-    connect(&m_timer, &QTimer::timeout, this, &Runner::fetch);
     connect(m_pNotifier.get(), &QSocketNotifier::activated, this, &Runner::onReadyRead);        // キーボードシーケンスの有効化
 }
 #elif Q_OS_WIN
@@ -34,7 +33,6 @@ Runner::Runner(QStringList _args, QObject *parent) : m_args(std::move(_args)), m
     manager(std::make_unique<QNetworkAccessManager>(this)),
     QObject{parent}
 {
-    connect(&m_timer, &QTimer::timeout, this, &Runner::fetch);
     connect(m_pNotifier.get(), &QWinEventNotifier::activated, this, &Runner::onReadyRead);      // キーボードシーケンスの有効化
 }
 #endif
@@ -132,41 +130,30 @@ void Runner::run()
         return;
     }
 
-#ifdef _BELOW_0_1_0
+#ifdef qNewsFlash_0_0
     // JSONファイル(スレッド書き込み用)のパスが空の場合は、デフォルトのパスを使用
     if (m_WriteFile.isEmpty()) {
         m_WriteFile = QString("/tmp/qNewsFlashWrite.json");
     }
 #endif
 
-    if (!m_AutoFetch) {
-        // 自動的にニュース記事を取得しない場合、タイマのシグナル / スロットを無効にする
-        disconnect(&m_timer, &QTimer::timeout, this, &Runner::fetch);
-    }
-    else {
-        // ニュース記事を取得する間隔 (未指定の場合、インターバルは30[分])
-        // ただし、3分未満には設定できない (3分未満に設定した場合は、3分に設定する)
-        if (m_interval == 0) {
-            std::cerr << "インターバルの値が未指定もしくは0のため、30[分]に設定されます" << std::endl;
-            m_interval = 60 * 1000 * 30;
-        }
-        else if (m_interval < (60 * 1000 * 3)) {
-            std::cerr << "インターバルの値が3[分]未満のため、3[分]に設定されます" << std::endl;
-            m_interval = 60 * 1000 * 3;
-        }
-        else if (m_interval < 0) {
-            std::cerr << "インターバルの値が不正です" << std::endl;
-
-            QCoreApplication::exit();
-            return;
-        }
-
+    if (m_AutoFetch) {
+        // ニュース記事の自動取得タイマの開始
+        connect(&m_timer, &QTimer::timeout, this, &Runner::fetch);
         m_timer.start(static_cast<int>(m_interval));
+
+        // 速報記事の自動取得タイマの開始
+        connect(&m_JiJiTimer, &QTimer::timeout, this, &Runner::JiJiFlashfetch);
+        m_JiJiTimer.start(static_cast<int>(m_JiJiinterval));
     }
 
-    // 本ソフトウェア開始直後にRSSを読み込む場合は、コメントを解除して、fetch()メソッドを実行する
-    // コメントアウトしている場合、最初にRSSを読み込むタイミングは、タイマの指定時間後となる
+    // 本ソフトウェア開始直後に各ニュース記事を読み込む場合は、コメントを解除して、fetch()メソッドを実行する
+    // コメントアウトしている場合、最初に各ニュース記事を読み込むタイミングは、タイマの指定時間後となる
     fetch();
+
+    // 本ソフトウェア開始直後に時事ドットコムから速報記事を読み込む場合は、コメントを解除して、JiJiFlashfetch()メソッドを実行する
+    // コメントアウトしている場合、最初に速報記事を読み込むタイミングは、タイマの指定時間後となる
+    JiJiFlashfetch();
 
     // ソフトウェアの自動起動が無効の場合
     // Cronを使用する場合、または、ワンショットで動作させる場合の処理
@@ -416,10 +403,10 @@ void Runner::fetch()
         // ただし、ニュース記事の本文を取得しない場合は、ニュース記事のタイトル --> 公開日 --> URL の順とする
         auto [title, paragraph, link, pubDate] = article.getArticleData();
 
-        m_ThreadInfo.message = QString("%1%2%3%4").arg(QString(title + "\n"),
-                                                       QString(pubDate + "\n\n"),
-                                                       QString(paragraph.length() == 0 ? "" : QString(paragraph + "\n")),
-                                                       QString(link + "\n"));
+        m_ThreadInfo.message = QString("%1%2%3%4").arg(title + "\n",
+                                                       pubDate + "\n\n",
+                                                       paragraph.length() == 0 ? "" : paragraph + "\n",
+                                                       link);
 
         // 現在時刻をエポックタイムで取得
         auto epocTime = GetEpocTime();
@@ -433,7 +420,7 @@ void Runner::fetch()
             return;
         }
 
-#if 1
+#if defined(qNewsFlash_0_1) || defined(qNewsFlash_0_2)
         // qNewsFlash 0.1.0から0.2.xまでの機能
 
         // スレッドのタイトルを変更するかどうか (防弾嫌儲およびニュース速報(Libre)等の掲示板で使用可能)
@@ -532,7 +519,7 @@ void Runner::fetch()
 
 #endif
 
-#ifdef _BELOW_0_1_0
+#ifdef qNewsFlash_0_0
         // qNewsFlash 0.1.0未満の機能
         // JSONファイル(スレッド書き込み用)に書き込む
         // 該当スレッドへの書き込み処理は各自で実装する
@@ -552,7 +539,7 @@ void Runner::fetch()
             return;
         }
     }
-#ifdef _BELOW_0_1_0
+#ifdef qNewsFlash_0_0
     // qNewsFlash 0.1.0未満の機能
     else {
 
@@ -1512,6 +1499,177 @@ void Runner::fetchTokyoNP()
 }
 
 
+void Runner::JiJiFlashfetch()
+{
+    // 時事ドットコムの速報記事を取得するかどうかを確認
+    if (!m_bJiJiFlash) {
+        return;
+    }
+
+    // 時事ドットコムから速報記事の取得
+    JiJiFlash jijiFlash(m_MaxParagraph, m_JiJiFlashInfo, this);
+    if (jijiFlash.FetchFlash()) {
+        return;
+    }
+
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
+    if (m_stopRequested.load()) return;
+
+    auto [title, paragraph, link, pubDate] = jijiFlash.getArticleData();
+
+    // 既に書き込み済みの速報記事の場合は無視
+    for (auto &writtenArticle : m_WrittenArticles) {
+        QString url = "";
+        std::tie(std::ignore, std::ignore, url, std::ignore) = writtenArticle.getArticleData();
+
+        if (url.compare(link, Qt::CaseSensitive) == 0) {
+            // 既に書き込み済みの記事の場合
+            return;
+        }
+    }
+
+#ifdef _DEBUG
+    qDebug() << "書き込む速報記事";
+    qDebug() << "Title : " << title;
+    qDebug() << "URL : " << link;
+    qDebug() << "Date : " << pubDate;
+    qDebug() << "";
+#endif
+
+    // 速報記事は、タイトル --> 公開日 --> URL の順に並べて書き込む
+    m_ThreadInfo.message = QString("%1%2%3").arg(QString(title + "\n"),
+                                                 QString(pubDate + "\n\n"),
+                                                 QString(link + "\n"));
+
+    // 現在時刻をエポックタイムで取得
+    auto epocTime = GetEpocTime();
+    m_ThreadInfo.time = QString::number(epocTime);
+
+    Poster poster(this);
+
+    // 掲示板のクッキーを取得
+    if (poster.fetchCookies(QUrl(m_RequestURL))) {
+        // クッキーの取得に失敗した場合
+        return;
+    }
+
+#if defined(qNewsFlash_0_1) || defined(qNewsFlash_0_2)
+    // qNewsFlash 0.1.0から0.2.xまでの機能
+
+    // スレッドのタイトルを変更するかどうか (防弾嫌儲およびニュース速報(Libre)等の掲示板で使用可能)
+    if (m_changeTitle) m_ThreadInfo.message.prepend("!chtt");
+
+    // 既存のスレッドに書き込み
+    if (poster.PostforWriteThread(QUrl(m_RequestURL), m_ThreadInfo)) {
+        // 既存のスレッドへの書き込みに失敗した場合
+        return;
+    }
+#else
+    // 今後の予定 : qNewsFlash 0.3.0以降
+
+    // 指定のスレッドがレス数の上限に達して書き込めない場合、スレッドを新規作成する
+    HtmlFetcher fetcher(this);
+    if (fetcher.checkUrlExistence(QUrl(m_ThreadURL))) {
+        // 設定ファイルにあるスレッドのURLが存在する場合
+
+        // ニュース記事を書き込むスレッドのレス数を取得
+        auto ret = checkLastThreadNum();
+        if (ret == -1) {
+            // 最後尾のレス番号の取得に失敗した場合
+            std::cerr << QString("エラー : レス数の取得に失敗").toStdString() << std::endl;
+                         return;
+        }
+        else if (ret == 1) {
+            // 既存のスレッドが最大レス数に達している場合、スレッドの新規作成
+
+            // 設定ファイルの"subject"キーの値が空欄の場合、ニュース記事のタイトルをスレッドのタイトルにする
+            // "subject"キーの値に%tトークンが存在する場合はニュース記事のタイトルに置換
+            if (m_ThreadInfo.subject.isEmpty()) {
+                m_ThreadInfo.subject = title;
+            }
+            else {
+                auto newTitle = replaceSubjectToken(m_ThreadInfo.subject, title);
+                m_ThreadInfo.subject = !newTitle.isEmpty() ? newTitle : title;
+            }
+
+            if (poster.PostforCreateThread(QUrl(m_RequestURL), m_ThreadInfo)) {
+                // スレッドの新規作成に失敗した場合
+                return;
+            }
+
+            // 新規作成したスレッドのURLとスレッド番号を取得
+            m_ThreadURL      = poster.GetNewThreadURL();
+            m_ThreadInfo.key = poster.GetNewThreadNum();
+
+            // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+            if (UpdateThreadJson()) {
+                // スレッド情報の保存に失敗
+                return;
+            }
+        }
+        else {
+            // 既存のスレッドが存在する場合
+
+            // スレッドのタイトルを変更するかどうか (防弾嫌儲およびニュース速報(Libre)等の掲示板で使用可能)
+            if (m_changeTitle) m_ThreadInfo.message.prepend("!chtt");
+
+            // 既存のスレッドに書き込み
+            if (poster.PostforWriteThread(QUrl(m_RequestURL), m_ThreadInfo)) {
+                // 既存のスレッドへの書き込みに失敗した場合
+                return;
+            }
+        }
+    }
+    else {
+        // 設定ファイルにあるスレッドのURLが存在しない場合 (スレッドを新規作成する)
+
+        // 設定ファイルの"subject"キーの値が空欄の場合、ニュース記事のタイトルをスレッドのタイトルにする
+        // "subject"キーの値に%tトークンが存在する場合はニュース記事のタイトルに置換
+        if (m_ThreadInfo.subject.isEmpty()) {
+            m_ThreadInfo.subject = title;
+        }
+        else {
+            auto newTitle = replaceSubjectToken(m_ThreadInfo.subject, title);
+            m_ThreadInfo.subject = !newTitle.isEmpty() ? newTitle : title;
+        }
+
+        // スレッドの新規作成
+        if (poster.PostforCreateThread(QUrl(m_RequestURL), m_ThreadInfo)) {
+            // スレッドの新規作成に失敗した場合
+            return;
+        }
+
+        // 新規作成したスレッドのURLとスレッド番号を取得
+        m_ThreadURL      = poster.GetNewThreadURL();
+        m_ThreadInfo.key = poster.GetNewThreadNum();
+
+        // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+        if (UpdateThreadJson()) {
+            // スレッド情報の保存に失敗
+            return;
+        }
+    }
+
+#endif
+
+    // 書き込み済みの記事を履歴として登録 (同じ記事を1日に2回以上書き込まないようにする)
+    // ただし、2日前以上の書き込み済み記事の履歴は削除する
+    Article article(title, paragraph, link, pubDate);
+    m_WrittenArticles.append(article);
+
+    // ログファイルに書き込む
+    if (writeLog(article)) {
+        QCoreApplication::exit();
+        return;
+    }
+
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
+    if (m_stopRequested.load()) return;
+
+    return;
+}
+
+
 void Runner::itemTagsforReuters(xmlNode *a_node)
 {
     for (auto cur_node = a_node; cur_node; cur_node = cur_node->next) {
@@ -1853,6 +2011,64 @@ int Runner::getConfiguration(QString &filepath)
         // ロイター通信の有効 / 無効
         m_bReuters          = JsonObject["reuters"].toBool(false);
 
+        // 時事ドットコムの速報ニュースオブジェクトの取得
+        auto jijiFlashObject  = JsonObject["jijiflash"].toObject();
+
+        /// 時事ドットコムの速報ニュースの有効 / 無効
+        m_bJiJiFlash          = jijiFlashObject["enable"].toBool(false);
+
+        if (m_bJiJiFlash) {
+            /// 時事ドットコムの速報ニュースを取得する時間間隔 (未指定の場合、インターバルは10[分])
+            /// ただし、1分未満には設定できない (1分未満に設定した場合は、1分に設定する)
+            auto jijiInterval            = jijiFlashObject["interval"].toString("600");
+            bool ok;
+            m_JiJiinterval = jijiInterval.toULongLong(&ok);
+            if (!ok) {
+                std::cerr << QString("警告 : 設定ファイルのjijiflash:intervalキーの値が不正です").toStdString() << std::endl;
+                std::cerr << QString("更新時間の間隔は、自動的に10分に設定されます").toStdString() << std::endl;
+
+                m_JiJiinterval = 10 * 60 * 1000;
+            }
+            else {
+                if (m_JiJiinterval == 0) {
+                    std::cerr << "インターバルの値が未指定もしくは0のため、10[分]に設定されます" << std::endl;
+                    m_JiJiinterval = 10 * 60 * 1000;
+                }
+                else if (m_JiJiinterval < (1 * 60)) {
+                    std::cerr << "インターバルの値が1[分]未満のため、1[分]に設定されます" << std::endl;
+                    m_JiJiinterval = 1 * 60 * 1000;
+                }
+                else if (m_JiJiinterval < 0) {
+                    std::cerr << "インターバルの値が不正です" << std::endl;
+                    return -1;
+                }
+                else {
+                    m_JiJiinterval *= 1000;
+                }
+            }
+
+            /// 時事ドットコムの速報記事の基準となるURL
+            m_JiJiFlashInfo.BasisURL     = jijiFlashObject["basisurl"].toString("");
+
+            /// 時事ドットコムの速報記事の一覧が存在するURL
+            m_JiJiFlashInfo.FlashUrl     = jijiFlashObject["flashurl"].toString("");
+
+            /// 時事ドットコムの速報記事が記載されているURLから速報記事のリンクを取得するXPath
+            m_JiJiFlashInfo.FlashXPath   = jijiFlashObject["flashxpath"].toString("");
+
+            /// 時事ドットコムの各速報記事のURLから記事のタイトルを取得するXPath
+            m_JiJiFlashInfo.TitleXPath   = jijiFlashObject["titlexpath"].toString("");
+
+            /// 時事ドットコムの各速報記事のURLから記事の本文を取得するXPath
+            m_JiJiFlashInfo.ParaXPath    = jijiFlashObject["paraxpath"].toString("");
+
+            /// 時事ドットコムの各速報記事のURLから記事の公開日を取得するXPath
+            m_JiJiFlashInfo.PubDateXPath = jijiFlashObject["pubdatexpath"].toString("");
+
+            /// 時事ドットコムの各速報記事のURLから"<この速報の記事を読む>"の部分のリンクを取得するXPath
+            m_JiJiFlashInfo.UrlXPath     = jijiFlashObject["urlxpath"].toString("");
+        }
+
         // tokyonp(東京新聞)オブジェクトの取得
         auto tokyoNPObject  = JsonObject["tokyonp"].toObject();
 
@@ -1890,8 +2106,21 @@ int Runner::getConfiguration(QString &filepath)
             m_interval = 30 * 60 * 1000;
         }
         else {
-            // ミリ秒に換算
-            m_interval *= 1000;
+            if (m_interval == 0) {
+                std::cerr << "インターバルの値が未指定もしくは0のため、30[分]に設定されます" << std::endl;
+                m_interval = 60 * 1000 * 30;
+            }
+            else if (m_interval < (3 * 60)) {
+                std::cerr << "インターバルの値が3[分]未満のため、3[分]に設定されます" << std::endl;
+                m_interval = 3 * 60 * 1000;
+            }
+            else if (m_interval < 0) {
+                std::cerr << "インターバルの値が不正です" << std::endl;
+                return -1;
+            }
+            else {
+                m_interval *= 1000;
+            }
         }
 
         // 排除する特定メディア
@@ -1910,7 +2139,7 @@ int Runner::getConfiguration(QString &filepath)
             m_MaxParagraph = 100;
         }
 
-#if 1
+#if defined(qNewsFlash_0_1) || defined(qNewsFlash_0_2)
         // qNewsFlash 0.1.0から0.2.xまでの機能
 
         // 掲示板へPOSTデータを送信するURL
@@ -1977,7 +2206,7 @@ int Runner::getConfiguration(QString &filepath)
         m_ThreadInfo.shiftjis   = threadObject["shiftjis"].toBool(true);  // Shift-JISの有効 / 無効
 #endif
 
-#ifdef   _BELOW_0_1_0
+#ifdef   qNewsFlash_0_0
         // qNewsFlash 0.1.0未満の機能
         // スレッド書き込み用のJSONファイルのパス
         auto writeFile = JsonObject["writefile"].toString("/tmp/qNewsFlashWrite.json");
@@ -2092,7 +2321,7 @@ int Runner::getConfiguration(QString &filepath)
             // 秒に換算
             m_interval *= 1000;
         }
-#ifdef _BELOW_0_1_0
+#ifdef qNewsFlash_0_0
         // qNewsFlash 0.1.0未満の機能
         else if (arg.mid(0, 8) == "--write=") {
             // News APIのAPIキーを取得
@@ -2192,7 +2421,7 @@ Article Runner::selectArticle()
 }
 
 
-#ifdef _BELOW_0_1_0
+#ifdef qNewsFlash_0_0
 // qNewsFlash 0.1.0未満の機能
 int Runner::writeJSON(Article &article)
 {
@@ -2361,7 +2590,7 @@ int Runner::setLogFile(QString &filepath)
 }
 
 
-#ifdef _BELOW_0_1_0
+#ifdef qNewsFlash_0_0
 int Runner::setLogFile()
 {
     QString logDir  = "";

@@ -97,7 +97,7 @@ int HtmlFetcher::fetchParagraph(QNetworkReply *reply, const QString& _xpath)
     // libxml2ではエンコーディングの自動判定において問題があるため、エンコーディングを明示的に指定する
     xmlDocPtr doc = htmlReadDoc((const xmlChar*)htmlContent.toStdString().c_str(), nullptr, "UTF-8", HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
     if (doc == nullptr) {
-        std::cerr << "Document not parsed successfully" << std::endl;
+        std::cerr << "エラー : HTMLドキュメントのパースに失敗" << std::endl;
         reply->deleteLater();
 
         return -1;
@@ -107,7 +107,7 @@ int HtmlFetcher::fetchParagraph(QNetworkReply *reply, const QString& _xpath)
     auto *xpath = xmlStrdup((const xmlChar*)_xpath.toUtf8().constData());
     xmlXPathObjectPtr result = getNodeset(doc, xpath);
     if (result == nullptr) {
-        std::cerr << "Error in getNodeset" << std::endl;
+        std::cerr << "エラー : ノードの取得に失敗" << std::endl;
         xmlFreeDoc(doc);
         reply->deleteLater();
 
@@ -152,20 +152,17 @@ xmlXPathObjectPtr HtmlFetcher::getNodeset(xmlDocPtr doc, const xmlChar *xpath)
 {
     xmlXPathContextPtr context = xmlXPathNewContext(doc);
     if (context == nullptr) {
-        std::cerr << "Error in xmlXPathNewContext" << std::endl;
         return nullptr;
     }
 
     xmlXPathObjectPtr result = xmlXPathEvalExpression(xpath, context);
     xmlXPathFreeContext(context);
     if (result == nullptr) {
-        std::cerr << "Error in xmlXPathEvalExpression" << std::endl;
         return nullptr;
     }
 
     if (xmlXPathNodeSetIsEmpty(result->nodesetval)) {
         xmlXPathFreeObject(result);
-        std::cerr << "No result" << std::endl;
         return nullptr;
     }
 
@@ -176,6 +173,8 @@ xmlXPathObjectPtr HtmlFetcher::getNodeset(xmlDocPtr doc, const xmlChar *xpath)
 // ニュース記事のURLにアクセスして、XPathで指定した値を取得する
 int HtmlFetcher::fetchElement(const QUrl &url, bool redirect, const QString &_xpath, int elementType)
 {
+    m_Element.clear();
+
     // リダイレクトを自動的にフォロー
     QNetworkRequest request(url);
 
@@ -226,7 +225,6 @@ int HtmlFetcher::fetchElement(const QUrl &url, bool redirect, const QString &_xp
     }
 
     // 結果のノードセットからテキストを取得
-    m_Element.clear();
     xmlNodeSetPtr nodeset = result->nodesetval;
     for (auto i = 0; i < nodeset->nodeNr; ++i) {
         xmlNodePtr cur = nodeset->nodeTab[i]->xmlChildrenNode;
@@ -249,6 +247,100 @@ int HtmlFetcher::fetchElement(const QUrl &url, bool redirect, const QString &_xp
     pReply->deleteLater();
 
     return 0;
+}
+
+
+int HtmlFetcher::fetchElementJiJiFlashUrl(const QUrl &url, bool redirect, const QString &_xpath, int elementType)
+{
+    m_Element.clear();
+
+    // リダイレクトを自動的にフォロー
+    QNetworkRequest request(url);
+
+    if (redirect) {
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, true);
+    }
+
+    auto pReply = m_pManager->get(request);
+
+    // レスポンス待機
+    QEventLoop loop;
+    QObject::connect(pReply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    // レスポンスの取得
+    if (pReply->error() != QNetworkReply::NoError) {
+        std::cerr << QString("エラー : %1").arg(pReply->errorString()).toStdString() << std::endl;
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    QString htmlContent = pReply->readAll();
+
+    // libxml2の初期化
+    xmlInitParser();
+    LIBXML_TEST_VERSION
+
+    // 文字列からHTMLドキュメントをパース
+    // libxml2ではエンコーディングの自動判定において問題があるため、エンコーディングを明示的に指定する
+    xmlDocPtr doc = htmlReadDoc((const xmlChar*)htmlContent.toStdString().c_str(), nullptr, "UTF-8", HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+    if (doc == nullptr) {
+        std::cerr << QString("エラー : HTMLドキュメントのパースに失敗").toStdString() << std::endl;
+        xmlCleanupParser();
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    // XPathで特定の要素を検索
+    auto *xpath = xmlStrdup((const xmlChar*)_xpath.toUtf8().constData());
+    xmlXPathObjectPtr result = getNodeset(doc, xpath);
+    if (result == nullptr) {
+        xmlFreeDoc(doc);
+        xmlCleanupParser();
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    // 結果のノードセットからテキストを取得
+    auto ret = 0;
+    if (getUrl(result->nodesetval, elementType)) {
+        ret = -1;
+    }
+
+    // libxml2オブジェクトの破棄
+    xmlXPathFreeObject(result);
+    xmlFreeDoc(doc);
+
+    // libxml2のクリーンアップ
+    xmlCleanupParser();
+
+    pReply->deleteLater();
+
+    return ret;
+}
+
+
+// 時事ドットコムの速報記事の"<この速報の記事を読む>"の部分のリンクを取得する
+bool HtmlFetcher::getUrl(const xmlNodeSetPtr nodeset, int elementType)
+{
+    for (auto i = 0; i < nodeset->nodeNr; i++) {
+        xmlNodePtr cur = nodeset->nodeTab[i]->xmlChildrenNode;
+        while (cur != nullptr) {
+            if (cur->type == elementType) {
+                QString tagName = (const char*)cur->name;
+                if (tagName.compare("a", Qt::CaseSensitive) == 0) {
+                    m_Element = (const char*)cur->properties->children->content;
+                    return true;
+                }
+            }
+            cur = cur->next;
+        }
+    }
+
+    return false;
 }
 
 

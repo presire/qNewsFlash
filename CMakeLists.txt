@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(qNewsFlash VERSION 0.2.0 LANGUAGES CXX)
+project(qNewsFlash VERSION 0.2.1 LANGUAGES CXX)
 
 
 # Linuxのみビルドを許可
@@ -81,6 +81,7 @@ add_executable(qNewsFlash
         Article.h Article.cpp
         RandomGenerator.h RandomGenerator.cpp
         Poster.h Poster.cpp
+        JiJiFlash.h JiJiFlash.cpp
 )
 
 
@@ -91,11 +92,21 @@ target_compile_definitions(qNewsFlash PRIVATE
 )
 
 ## バージョンが0.1.0未満の場合、_BELOW_0_1_0プリプロセッサを定義
-if(PROJECT_VERSION VERSION_LESS 0.1.0)
-    target_compile_definitions(qNewsFlash PRIVATE
-        _BELOW_0_1_0
-    )
-endif()
+#if(PROJECT_VERSION VERSION_LESS 0.1.0)
+#    target_compile_definitions(qNewsFlash PRIVATE
+#        _BELOW_0_1_0
+#    )
+#endif()
+
+## バージョンプリプロセッサを定義 (x.y)
+target_compile_definitions(qNewsFlash PRIVATE
+    -D${PROJECT_NAME}_${PROJECT_VERSION_MAJOR}_${PROJECT_VERSION_MINOR}
+)
+
+## バージョンプリプロセッサを定義 (x.y.z)
+target_compile_definitions(qNewsFlash PRIVATE
+    -D${PROJECT_NAME}_${PROJECT_VERSION_MAJOR}_${PROJECT_VERSION_MINOR}_${PROJECT_VERSION_PATCH}
+)
 
 ## ARMまたはAARCH64かどうかを確認
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")

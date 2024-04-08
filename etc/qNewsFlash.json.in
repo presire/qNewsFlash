@@ -19,6 +19,17 @@
     "from": "",
     "interval": "1800",
     "jiji": true,
+    "jijiflash": {
+        "basisurl": "https://www.jiji.com",
+        "enable": false,
+        "flashurl": "https://www.jiji.com/jc/list?g=flash",
+        "flashxpath": "/html/body/div[@id='Contents']/div[@id='ContentsInner']/div[@id='Main']/div[contains(@class, 'MainInner mb30')]/div[contains(@class, 'ArticleListMain')]/ul[@class='LinkList']/li[1]/a/@href",
+        "interval": "600",
+        "paraxpath": "/html/head/meta[@name='description']/@content",
+        "pubdatexpath": "/html/head/meta[@name='pubdate']/@content",
+        "titlexpath": "/html/head/meta[@name='title']/@content",
+        "urlxpath": "/html/body/div[@id='Contents']//div[@id='ContentsInner']//div[@id='Main']//div[contains(@class, 'MainInner Individual')]//article//div[contains(@class, 'ArticleText clearfix')]//p[@class='ArticleTextTab']"
+    },
     "key": "",
     "kyodo": true,
     "logfile": "/var/log/qNewsFlash_log.json",

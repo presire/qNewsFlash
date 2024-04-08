@@ -18,6 +18,7 @@
 #include <libxml/tree.h>
 #include <tuple>
 #include <memory>
+#include "JiJiFlash.h"
 #include "Article.h"
 #include "Poster.h"
 
@@ -44,7 +45,7 @@ private:  // Variables
     bool                                    m_AutoFetch;        // ワンショット機能の有効 / 無効
                                                                 // メンバ変数m_intervalの値を使用して自動的にニュース記事を取得するかどうか
 
-#ifdef _BELOW_0_1_0
+#ifdef qNewsFlash_0_0
     QString                                 m_WriteFile;        // スレッド書き込み用のJSONファイルのパス
 #endif
 
@@ -52,9 +53,12 @@ private:  // Variables
                                                                 // qNewsFlash.jsonファイルに設定を記述する
                                                                 // デフォルト : /var/log/qNewsFlash_log.json
     QTimer                                  m_timer;            // ニュース記事を取得するためのインターバル時間をトリガとするタイマ
+    QTimer                                  m_JiJiTimer;        // 時事ドットコムの速報記事を取得するためのインターバル時間をトリガとするタイマ
     unsigned long long                      m_interval;         // ニュース記事を取得する時間間隔
+    unsigned long long                      m_JiJiinterval;     // 時事ドットコムから速報ニュースを取得する時間間隔
     bool                                    m_bNewsAPI;         // News APIからニュース記事を取得するかどうか
     bool                                    m_bJiJi;            // 時事ドットコムからニュース記事を取得するかどうか
+    bool                                    m_bJiJiFlash;       // 時事ドットコムから速報ニュースを取得するかどうか
     bool                                    m_bKyodo;           // 共同通信からニュース記事を取得するかどうか
     bool                                    m_bAsahi;           // 朝日新聞デジタルからニュース記事を取得するかどうか
     bool                                    m_bCNet;            // CNET Japanからニュース記事を取得するかどうか
@@ -92,6 +96,7 @@ private:  // Variables
                                             m_ThreadXPath;      // スレッドのレス数を取得するためのXPath
     int                                     m_maxThreadNum;     // スレッドの最大レス数
     THREAD_INFO                             m_ThreadInfo;       // 記事を書き込むスレッドの情報
+    JIJIFLASHINFO                           m_JiJiFlashInfo;    // 時事ドットコムの速報ニュースの取得に必要な情報
 
 public:  // Variables
 
@@ -99,7 +104,7 @@ private:  // Methods
     int            getConfiguration(QString &filepath);         // このソフトウェアの設定ファイルの情報を取得
     [[maybe_unused]] void        GetOption();                   // コマンドラインオプションの取得 (現在は未使用)
 
-#ifdef _BELOW_0_1_0
+#ifdef qNewsFlash_0_0
     int         setLogFile();                                   // このソフトウェアのログ情報を保存するファイルのパスを設定
                                                                 // ログ情報とは、本日の書き込み済みのニュース記事群を指す
 #endif
@@ -131,7 +136,7 @@ private:  // Methods
     int            writeLog(Article &article);                  // 書き込み済みのニュース記事をJSONファイルに保存
     int            updateDateJson(const QString &currentDate);  // 最後にニュース記事を取得した日付を設定ファイルに保存 (フォーマット : "yyyy/M/d")
 
-#ifdef _BELOW_0_1_0
+#ifdef qNewsFlash_0_0
     int            writeJSON(Article &article);                 // 選択したニュース記事をJSONファイルに保存
     int            truncateJSON();                              // スレッド書き込み用のJSONファイルの内容を空にする
 #endif
@@ -167,6 +172,7 @@ public slots:
     void fetchHanJRSS();        // ハンギョレジャパンからニュース記事の取得後に実行するスロット
     void fetchReutersRSS();     // ロイター通信からニュース記事の取得後に実行するスロット
     void fetchTokyoNP();        // 東京新聞からニュース記事の取得後に実行するスロット
+    void JiJiFlashfetch();      // 時事ドットコムから速報記事の取得
     void onReadyRead();         // ノンブロッキングでキー入力を受信するスロット
 };
 
