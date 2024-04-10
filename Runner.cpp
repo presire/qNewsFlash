@@ -1506,6 +1506,47 @@ void Runner::JiJiFlashfetch()
         return;
     }
 
+    // 現在の日時を取得して日付が変わっているかどうかを確認
+    /// 日本のタイムゾーンを設定
+    auto now = QDateTime::currentDateTimeUtc().toTimeZone(QTimeZone("Asia/Tokyo"));
+
+    /// 現在の年月日のみを取得
+    auto currentDate = now.date();
+    auto date = QString("%1/%2/%3").arg(currentDate.year()).arg(currentDate.month()).arg(currentDate.day());
+
+    /// 前回のニュース記事を取得した日付と比較
+    if (m_LastUpdate.compare(date, Qt::CaseSensitive) != 0) {
+        /// 日付が変わっている場合
+        m_LastUpdate = date;
+
+        /// メンバ変数m_WrittenArticlesから、書き込み済みの2日以上前の記事群を削除
+        m_WrittenArticles.clear();
+
+        /// ログファイルから、2日以上前の書き込み済みニュース記事を削除
+        if (deleteLogNotToday()) {
+            QCoreApplication::exit();
+            return;
+        }
+
+        /// ログファイルから、今日と昨日の書き込み済みのニュース記事を取得
+        /// また、取得した記事群のデータはメンバ変数m_WrittenArticlesに格納
+        if (getDatafromWrittenLog()) {
+            QCoreApplication::exit();
+            return;
+        }
+    }
+
+    // 設定ファイルの"update"キーを更新
+    if (updateDateJson(m_LastUpdate)) {
+        QCoreApplication::exit();
+        return;
+    }
+
+    // 前回取得した書き込み前の記事群(選定前)を初期化
+    m_BeforeWritingArticles.clear();
+
+    if (m_stopRequested.load()) return;
+
     // 時事ドットコムから速報記事の取得
     JiJiFlash jijiFlash(m_MaxParagraph, m_JiJiFlashInfo, this);
     if (jijiFlash.FetchFlash()) {
