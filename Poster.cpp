@@ -66,26 +66,26 @@ int Poster::PostforWriteThread(const QUrl &url, THREAD_INFO &ThreadInfo)
         // UTF-8用 (QUrlQueryクラスはShift-JISに非対応)
         QUrlQuery query;
 
-        query.addQueryItem("subject",   "");                    // スレッドのタイトル (スレッドに書き込む場合は空欄にする)
-        query.addQueryItem("FROM",      ThreadInfo.from);       // 名前欄
-        query.addQueryItem("mail",      ThreadInfo.mail);       // メール欄
-        query.addQueryItem("MESSAGE",   ThreadInfo.message);    // 書き込む内容
-        query.addQueryItem("bbs",       ThreadInfo.bbs);        // BBS名
-        query.addQueryItem("time",      ThreadInfo.time);       // エポックタイム (UNIXタイムまたはPOSIXタイム)
-        query.addQueryItem("key",       ThreadInfo.key);        // 書き込むスレッド番号 (スレッドに書き込む場合は入力する)
+        query.addQueryItem("subject",   "");                            // スレッドのタイトル (スレッドに書き込む場合は空欄にする)
+        query.addQueryItem("FROM",      ThreadInfo.from);               // 名前欄
+        query.addQueryItem("mail",      ThreadInfo.mail);               // メール欄
+        query.addQueryItem("MESSAGE",   urlEncode(ThreadInfo.message)); // 書き込む内容
+        query.addQueryItem("bbs",       ThreadInfo.bbs);                // BBS名
+        query.addQueryItem("time",      ThreadInfo.time);               // エポックタイム (UNIXタイムまたはPOSIXタイム)
+        query.addQueryItem("key",       ThreadInfo.key);                // 書き込むスレッド番号 (スレッドに書き込む場合は入力する)
 
         encodedPostData = query.toString(QUrl::FullyEncoded).toUtf8();  // POSTデータをバイト列へ変換
     }
     else {
         // Shift-JIS用
         QString postMessage = QString("subject=%1&FROM=%2&mail=%3&MESSAGE=%4&bbs=%5&time=%6&key=%7")
-                                  .arg(ThreadInfo.subject,  // スレッドのタイトル (スレッドに書き込む場合は空欄にする)
-                                       ThreadInfo.from,     // 名前欄
-                                       ThreadInfo.mail,     // メール欄
-                                       ThreadInfo.message,  // 書き込む内容
-                                       ThreadInfo.bbs,      // BBS名
-                                       ThreadInfo.time,     // エポックタイム (UNIXタイムまたはPOSIXタイム)
-                                       ThreadInfo.key       // 書き込むスレッド番号 (スレッドに書き込む場合は入力する)
+                                  .arg("",                              // スレッドのタイトル (スレッドに書き込む場合は空欄にする)
+                                       ThreadInfo.from,                 // 名前欄
+                                       ThreadInfo.mail,                 // メール欄
+                                       urlEncode(ThreadInfo.message),   // 書き込む内容
+                                       ThreadInfo.bbs,                  // BBS名
+                                       ThreadInfo.time,                 // エポックタイム (UNIXタイムまたはPOSIXタイム)
+                                       ThreadInfo.key                   // 書き込むスレッド番号 (スレッドに書き込む場合は入力する)
                                        );
         auto postData   = postMessage.toUtf8();             // POSTデータをバイト列へ変換
 
@@ -133,24 +133,24 @@ int Poster::PostforCreateThread(const QUrl &url, THREAD_INFO &ThreadInfo)
         // UTF-8用 (QUrlQueryクラスはShift-JISに非対応)
         QUrlQuery query;
 
-        query.addQueryItem("subject",   ThreadInfo.subject);    // スレッドのタイトル (スレッドを新規作成する場合は入力する)
-        query.addQueryItem("FROM",      ThreadInfo.from);       // 名前欄
-        query.addQueryItem("mail",      ThreadInfo.mail);       // メール欄
-        query.addQueryItem("MESSAGE",   ThreadInfo.message);    // 書き込む内容
-        query.addQueryItem("bbs",       ThreadInfo.bbs);        // BBS名
-        query.addQueryItem("time",      ThreadInfo.time);       // エポックタイム (UNIXタイムまたはPOSIXタイム)
+        query.addQueryItem("subject",   urlEncode(ThreadInfo.subject)); // スレッドのタイトル (スレッドを新規作成する場合は入力する)
+        query.addQueryItem("FROM",      ThreadInfo.from);               // 名前欄
+        query.addQueryItem("mail",      ThreadInfo.mail);               // メール欄
+        query.addQueryItem("MESSAGE",   urlEncode(ThreadInfo.message)); // 書き込む内容
+        query.addQueryItem("bbs",       ThreadInfo.bbs);                // BBS名
+        query.addQueryItem("time",      ThreadInfo.time);               // エポックタイム (UNIXタイムまたはPOSIXタイム)
 
         encodedPostData = query.toString(QUrl::FullyEncoded).toUtf8();  // POSTデータをバイト列へ変換
     }
     else {
         // Shift-JIS用
         QString postMessage = QString("subject=%1&FROM=%2&mail=%3&MESSAGE=%4&bbs=%5&time=%6")
-                                  .arg(ThreadInfo.subject,  // スレッドのタイトル (スレッドを立てる場合のみ入力)
-                                       ThreadInfo.from,     // 名前欄
-                                       ThreadInfo.mail,     // メール欄
-                                       ThreadInfo.message,  // 書き込む内容
-                                       ThreadInfo.bbs,      // BBS名
-                                       ThreadInfo.time      // エポックタイム (UNIXタイムまたはPOSIXタイム)
+                                  .arg(urlEncode(ThreadInfo.subject),   // スレッドのタイトル (スレッドを立てる場合のみ入力)
+                                       ThreadInfo.from,                 // 名前欄
+                                       ThreadInfo.mail,                 // メール欄
+                                       urlEncode(ThreadInfo.message),   // 書き込む内容
+                                       ThreadInfo.bbs,                  // BBS名
+                                       ThreadInfo.time                  // エポックタイム (UNIXタイムまたはPOSIXタイム)
                                        );
         auto postData   = postMessage.toUtf8();             // POSTデータをバイト列へ変換
 
@@ -318,8 +318,22 @@ QString Poster::GetNewThreadNum() const
 }
 
 
-// エンコードされたバイト列をURLエンコードする
-[[maybe_unused]] QString Poster::urlEncode(const QByteArray &byteArray)
+// URLエンコードする
+QString Poster::urlEncode(const QString &originalString)
 {
-    return QString::fromUtf8(byteArray.toPercentEncoding());
+    // URLエンコードする文字
+    QVector<QString> toEncode = {"+", "&", "#", "=", "|", "[", "]", "{", "}", "'", "\"", "<", ">", " "};
+    QVector<QString> encoded;
+
+    // 置換処理
+    for (const auto &str : qAsConst(toEncode)) {
+        encoded.append(QUrl::toPercentEncoding(str));
+    }
+
+    QString encodedString = originalString;
+    for (int i = 0; i < toEncode.size(); ++i) {
+        encodedString.replace(toEncode[i], encoded[i]);
+    }
+
+    return encodedString;
 }

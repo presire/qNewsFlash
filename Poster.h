@@ -52,7 +52,7 @@ private:
     int         replyPostFinished(QNetworkReply *reply, const QUrl &url,                // POSTデータ送信後のレスポンスを確認する (新規スレッド作成用)
                                   const THREAD_INFO &ThreadInfo);
     [[maybe_unused]] static QByteArray  encodeStringToShiftJIS(const QString &str);     // 文字列をShift-JISにエンコードする
-    [[maybe_unused]] static QString     urlEncode(const QByteArray& byteArray);         // エンコードされたバイト列をURLエンコードする
+    static QString     urlEncode(const QString &originalString);                        // URLエンコードする
 
 public:
     explicit    Poster(QObject *parent = nullptr);
