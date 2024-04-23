@@ -1558,6 +1558,13 @@ void Runner::JiJiFlashfetch()
 
     auto [title, paragraph, link, pubDate] = jijiFlash.getArticleData();
 
+    // 速報記事の公開日を確認
+    // 今日の速報記事ではない場合は無視
+    auto isCheckDate = isToday(pubDate);
+    if (!isCheckDate) {
+        return;
+    }
+
     // 既に書き込み済みの速報記事の場合は無視
     for (auto &writtenArticle : m_WrittenArticles) {
         QString url = "";

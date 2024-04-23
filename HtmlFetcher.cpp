@@ -1,6 +1,5 @@
 #include <QTextCodec>
 #include <iostream>
-#include <regex>
 #include "HtmlFetcher.h"
 
 
