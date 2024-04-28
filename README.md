@@ -447,11 +447,12 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
     例えば、政治ニュースの記事を取得する場合は、"https://www.tokyo-np.co.jp/n/politics" を指定します。  
     <br>
   * topxpath  
-    デフォルト値 : <code>"/html/body/div[1]/div[2]/main/div/div[1]/div/div[3]/div[1]/div/div[contains(@class, 'thumb')]/a/@href"</code>  
+    デフォルト値 (2024年4月現在) : <code>"/html/body/div[@id='document']/div[@id='document-wrapper']/main[contains(@class, 'main-container')]/div[contains(@class, 'content-area')]/div[contains(@class, 'l-wrapper')]/div[contains(@class, 'l-container')]/div[contains(@class, 'cmp-m-catelst002')]/div[contains(@class, 'cmp-thmb001 pt-20 pb-20')]/div[contains(@class, 'wrp lv2')]/div[contains(@class, 'thumb')]/a/@href"</code>  
+    <br>
     **<u>総合ニュースを取得する場合</u>**、ヘッドラインニュースを取得するXPath式を指定します。  
     <br>
-    2024年3月現在、総合ニュースからヘッドラインニュースを取得する完全なXPath式は、以下の通りです。  
-    <code>/html/body/div[@id='document']/div[@id='document-wrapper']//main[contains(@class, 'main-container')]//div[contains(@class, 'content-area')]//div[contains(@class, 'l-wrapper')]//div[contains(@class, 'l-container')]//div[contains(@class, 'cmp-m-catelst002')]//div[contains(@class, 'cmp-thmb001 pt-20 pb-20')]//div[contains(@class, 'wrp lv2')]//div[contains(@class, 'thumb')]/a/@href</code>  
+    総合ニュースからヘッドラインニュースを取得する省略されたXPath式は、以下の通りです。  
+    <code>/html/body/div[1]/div[2]/main/div/div[1]/div/div[2]/div[1]/div/div[contains(@class, 'thumb')]/a/@href</code>  
     <br>
     **※1**  
     **ヘッドラインニュースを取得しない場合は、この値を空欄にしてください。**  
@@ -463,12 +464,13 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
     **ただし、Webサイトの構成が変更された場合は、それに合わせてこの値を変更する必要があります。**  
     <br>
   * newsxpath  
-    デフォルト値 : <code>"/html/body/div[1]/div[2]/main/div/div[1]/div/div[3]/div[4]/div/ul/li/div[contains(@class, 'cmp-thmb001 js-link')]/@data-href"</code>  
+    デフォルト値 (2024年4月現在) : <code>"/html/body/div[@id='document']/div[@id='document-wrapper']/main[contains(@class, 'main-container')]/div[contains(@class, 'content-area')]/div[contains(@class, 'l-wrapper')]/div[contains(@class, 'l-container')]/div[contains(@class, 'cmp-m-catelst002')]/div[contains(@class, 'cmp-lst001 col-2 reverse')]/div[contains(@class, 'l-artlst001')]/ul[contains(@class, 'list')]/li[contains(@class, 'item')]/div[contains(@class, 'cmp-thmb001 js-link')]/@data-href"</code>  
+    <br>
     各ニュース記事を取得するXPath式を指定します。  
     デフォルト値は、総合ニュースからヘッドライン以外の記事を取得するXPath式となっております。  
     <br>
-    2024年3月現在、総合ニュースからヘッドライン以外の記事を取得する完全なXPath式は、以下の通りです。  
-    <code>/html/body/div[@id='document']/div[@id='document-wrapper']//main[contains(@class, 'main-container')]//div[contains(@class, 'content-area')]//div[contains(@class, 'l-wrapper')]//div[contains(@class, 'l-container')]//div[contains(@class, 'cmp-m-catelst002')]//div[contains(@class, 'cmp-lst001 col-2 reverse')]//div[contains(@class, 'l-artlst001')]//ul[contains(@class, 'list')]//li[contains(@class, 'item')]//div[contains(@class, 'cmp-thmb001 js-link')]/@data-href</code>  
+    総合ニュースからヘッドライン以外の記事を取得する省略されたXPath式は、以下の通りです。  
+    <code>/html/body/div[1]/div[2]/main/div/div[1]/div/div[2]/div[4]/div/ul/li/div[contains(@class, 'cmp-thmb001 js-link')]/@data-href</code>  
     <br>
     **※  ただし、Webサイトの構成が変更された場合は、それに合わせてこの値を変更する必要があります。**  
     <br>
