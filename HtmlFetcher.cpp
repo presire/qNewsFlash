@@ -1,4 +1,7 @@
 #include <QTextCodec>
+#include <libxml/parser.h>
+#include <libxml/xpath.h>
+#include <iconv.h>
 #include <iostream>
 #include "HtmlFetcher.h"
 
@@ -22,7 +25,7 @@ HtmlFetcher::~HtmlFetcher() = default;
 // 指定されたURLが存在するかどうかを確認する
 bool HtmlFetcher::checkUrlExistence(const QUrl &url)
 {
-    QNetworkAccessManager *manager = new QNetworkAccessManager();
+    QNetworkAccessManager manager;
 
     // HEADリクエストの作成
     QNetworkRequest request(url);
@@ -31,7 +34,7 @@ bool HtmlFetcher::checkUrlExistence(const QUrl &url)
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, false);
 
     // HEADを取得
-    QNetworkReply *pReply = manager->get(request);
+    QNetworkReply *pReply = manager.get(request);
 
     // レスポンス待機
     QEventLoop loop;
@@ -39,6 +42,7 @@ bool HtmlFetcher::checkUrlExistence(const QUrl &url)
     loop.exec();
 
     // レスポンスの確認
+    // 例: Webサーバのコンテンツが見つからない場合は、QNetworkReply::ContentNotFoundErrorが返る (HTTPエラー404と同様)
     if (pReply->error() == QNetworkReply::NoError) {
         // ステータスコードの確認
         int statusCode = pReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -51,6 +55,131 @@ bool HtmlFetcher::checkUrlExistence(const QUrl &url)
     pReply->deleteLater();
 
     return false;
+}
+
+
+// 指定されたURLが存在するかどうかを確認する
+/// スレッドが生存している場合 : 0
+/// スレッドが落ちている場合 : 1
+/// スレッド情報の取得に失敗した場合 : -1
+int HtmlFetcher::checkUrlExistence(const QUrl &url, const QString ExpiredElement, const QString ExpiredXPath, bool shiftjis)
+{
+    // まず、Webページが存在するかどうかを確認する
+    QNetworkAccessManager manager;
+
+    /// HEADリクエストの作成
+    QNetworkRequest request(url);
+
+    /// リダイレクトの無効
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, false);
+
+    /// HEADを取得
+    QNetworkReply *pReply = manager.get(request);
+
+    /// レスポンス待機
+    QEventLoop loop;
+    QObject::connect(pReply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    /// レスポンスの確認
+    /// 例: Webページが存在しない場合は、QNetworkReply::ContentNotFoundErrorが返る (HTTPエラー404と同様)
+    if (pReply->error() == QNetworkReply::ContentNotFoundError) {
+        /// ステータスコードの確認
+        int statusCode = pReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (statusCode == 404) {
+            /// Webページが存在しない場合 (HTTPエラー404)
+            pReply->deleteLater();
+            return 1;
+        }
+    }
+
+    // 次に、Webページが存在する場合であっても落ちているスレッドのページが返る時がある
+    // そのため、Webページから任意のタグの値 (デフォルトの設定では、スレッドのタイトル名) を取得および比較して、再度、スレッドの生存を確認する
+    QString checkElement = "";  // Webページから取得するタグの値
+
+    /// リクエストの作成
+    request.setUrl(url);
+
+    /// リダイレクトを有効
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, true);
+
+    /// レスポンスを取得
+    pReply = manager.get(request);
+
+    /// レスポンス待機
+    QObject::connect(pReply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    /// レスポンスの確認
+    if (pReply->error() == QNetworkReply::NoError) {
+        QString encodedData = "";
+        if (shiftjis) {
+            /// Shift-JISからUTF-8へエンコード
+            auto codec  = QTextCodec::codecForName("Shift-JIS");
+            encodedData = codec->toUnicode(pReply->readAll());
+        }
+        else {
+            encodedData = pReply->readAll();
+        }
+
+        xmlDocPtr doc = htmlReadDoc((const xmlChar*)encodedData.toStdString().c_str(), nullptr, "UTF-8", HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+        if (doc == nullptr) {
+            std::cerr << QString("HTMLドキュメントのパースに失敗").toStdString() << std::endl;
+            return -1;
+        }
+
+        xmlXPathContext* xpathCtx = xmlXPathNewContext(doc);
+        if (xpathCtx == nullptr) {
+            std::cerr << QString("XPathコンテキストの作成に失敗").toStdString() << std::endl;
+            xmlFreeDoc(doc);
+
+            return -1;
+        }
+
+        xmlXPathObject* xpathObj = xmlXPathEvalExpression((const xmlChar*)ExpiredXPath.toStdString().c_str(), xpathCtx);
+        if (xpathObj == nullptr) {
+            std::cerr << QString("XPath式の評価に失敗").toStdString() << std::endl;
+            xmlXPathFreeContext(xpathCtx);
+            xmlFreeDoc(doc);
+
+            return -1;
+        }
+
+        if (xpathObj->nodesetval && xpathObj->nodesetval->nodeNr > 0) {
+            xmlNode* elementNode = xpathObj->nodesetval->nodeTab[0];
+            if (elementNode->children && elementNode->children->content) {
+                /// スレッドのタイトル名を取得
+                checkElement = reinterpret_cast<const char*>(elementNode->children->content);
+
+                /// 設定ファイルの"expiredelement"キーの値と取得したタグの値を比較
+                /// デフォルトの設定では、スレッドタイトル名 (落ちている状態のスレッドタイトル名) を比較
+                // if (checkElement.compare(ExpiredElement, Qt::CaseSensitive) == 0) {
+                if (checkElement.compare(ExpiredElement, Qt::CaseSensitive) != 0) {
+                    /// スレッドが落ちていると判断した場合
+                    xmlXPathFreeObject(xpathObj);
+                    xmlXPathFreeContext(xpathCtx);
+                    xmlFreeDoc(doc);
+
+                    return 1;
+                }
+            }
+        }
+
+        xmlXPathFreeObject(xpathObj);
+        xmlXPathFreeContext(xpathCtx);
+        xmlFreeDoc(doc);
+
+        pReply->deleteLater();
+    }
+    else {
+        /// レスポンスの取得に失敗した場合
+        std::cerr << QString("ネットワークエラー: %1").arg(pReply->errorString()).toStdString() << std::endl;
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    return 0;
 }
 
 
@@ -395,23 +524,23 @@ int HtmlFetcher::fetchLastThreadNum(const QUrl &url, bool redirect, const QStrin
         return -1;
     }
 
-    // 結果のノードセットからテキストを取得
+    // 結果のノードセットから最後尾のレス番号を取得
     m_Element.clear();
     xmlNodeSetPtr nodeset = result->nodesetval;
-//    for (auto i = 0; i < nodeset->nodeNr; ++i) {
-//        xmlNodePtr cur = nodeset->nodeTab[i]->xmlChildrenNode;
-//        while (cur != nullptr) {
-//            if (cur->type == elementType) {
-//                auto buffer = QString(((const char*)cur->content)) + QString(" ");
-//                m_Element.append(buffer);
-//            }
-//            cur = cur->next;
-//        }
-//    }
+
+    /// 最後尾のノードセットを取得する
     xmlNodePtr cur = nodeset->nodeTab[nodeset->nodeNr - 1]->xmlChildrenNode;
     if (cur->type == elementType) {
         auto buffer = QString(((const char*)cur->content));
         m_Element.append(buffer);
+    }
+    else {
+        /// XPathで取得したノードセットが最後尾に1つ多く取得される場合があるため、最後尾から1つ前のノードセットを取得する
+        cur = nodeset->nodeTab[nodeset->nodeNr - 2]->xmlChildrenNode;
+        if (cur->type == elementType) {
+            auto buffer = QString(((const char*)cur->content));
+            m_Element.append(buffer);
+        }
     }
 
     // libxml2オブジェクトの破棄
@@ -504,6 +633,110 @@ int HtmlFetcher::extractThreadPath(const QString &htmlContent, const QString &bb
 
     // スレッドのパスおよびスレッド番号の取得に失敗した場合はエラーとする
     if (m_ThreadPath.isEmpty() && m_ThreadNum.isEmpty()) return -1;
+
+    return 0;
+}
+
+
+// 既存のスレッドからスレッドのタイトルを抽出する
+int HtmlFetcher::extractThreadTitle(const QUrl &url, bool redirect, const QString &_xpath, bool bShiftJIS)
+{
+    // リダイレクトを自動的にフォロー
+    QNetworkRequest request(url);
+
+    if (redirect) {
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, true);
+    }
+
+    auto pReply = m_pManager->get(request);
+
+    // レスポンス待機
+    QEventLoop loop;
+    QObject::connect(pReply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    // レスポンスの取得
+    if (pReply->error() != QNetworkReply::NoError) {
+        std::cerr << QString("エラー : %1").arg(pReply->errorString()).toStdString() << std::endl;
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    // 本文の一部を取得
+    if (pReply->error() != QNetworkReply::NoError) {
+        // ステータスコードの確認
+        int statusCode = pReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (statusCode == 404) {
+            // 該当スレッドが存在しない(落ちている)場合
+            pReply->deleteLater();
+            return 1;
+        }
+
+        std::cerr << QString("エラー : %1").arg(pReply->errorString()).toStdString();
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    QString htmlContent;
+    if (bShiftJIS) {
+        // Shift-JISからUTF-8へエンコード
+        auto codec  = QTextCodec::codecForName("Shift-JIS");
+        htmlContent = codec->toUnicode(pReply->readAll());
+    }
+    else {
+        htmlContent = pReply->readAll();
+    }
+
+    // libxml2の初期化
+    xmlInitParser();
+    LIBXML_TEST_VERSION
+
+    // 文字列からHTMLドキュメントをパース
+    // libxml2ではエンコーディングの自動判定において問題があるため、エンコーディングを明示的に指定する
+    xmlDocPtr doc = htmlReadDoc((const xmlChar*)htmlContent.toStdString().c_str(), nullptr, "UTF-8", HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+    if (doc == nullptr) {
+        std::cerr << QString("エラー: スレッドURLからHTMLのパースに失敗しました").toStdString() << std::endl;
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    // XPathで特定の要素を検索
+    auto *xpath = xmlStrdup((const xmlChar*)_xpath.toUtf8().constData());
+    xmlXPathObjectPtr result = getNodeset(doc, xpath);
+    if (result == nullptr) {
+        std::cerr << QString("エラー: スレッドURLからノードの取得に失敗しました").toStdString() << std::endl;
+        xmlFreeDoc(doc);
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    // 結果のノードセットからテキストを取得
+    xmlNodeSetPtr nodeset = result->nodesetval;
+    QString content = "";
+
+    for (auto i = 0; i < nodeset->nodeNr; ++i) {
+        xmlNodePtr cur = nodeset->nodeTab[i]->xmlChildrenNode;
+        while (cur != nullptr) {
+            if (cur->type == XML_TEXT_NODE) {
+                auto buffer = QString(((const char*)cur->content));
+                content.append(buffer);
+            }
+            cur = cur->next;
+        }
+    }
+
+    // エレメントを取得
+    m_Element = content;
+
+    xmlXPathFreeObject(result);
+    xmlFreeDoc(doc);
+    xmlCleanupParser();
+
+    pReply->deleteLater();
 
     return 0;
 }

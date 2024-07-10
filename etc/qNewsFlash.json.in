@@ -1,24 +1,24 @@
 {
-    "api": "",
-    "asahi": false,
+    "asahi": {
+        "enable": false,
+        "rss": "https://www.asahi.com/rss/asahi/newsheadlines.rdf"
+    },
     "autofetch": true,
-    "bbs": "",
-    "chtt": false,
-    "cnet": true,
-    "exclude": [
-        "Kbc.co.jp",
-        "Sponichi.co.jp",
-        "Bunshun.jp",
-        "Famitsu.com",
-        "Sma.co.jp",
-        "Oricon.co.jp",
-        "Jleague.jp",
-        "YouTube"
-    ],
-    "hanj": false,
-    "from": "",
+    "cnet": {
+        "enable": true,
+        "paraxpath": "/html/head/meta[@property='og:description']/@content",
+        "rss": "http://feeds.japan.cnet.com/rss/cnet/all.rdf"
+    },
+    "hanj": {
+        "enable": false,
+        "rss": "https://japan.hani.co.kr/rss/",
+        "toppage": "https://japan.hani.co.kr"
+    },
     "interval": "1800",
-    "jiji": true,
+    "jiji": {
+        "enable": true,
+        "rss": "https://www.jiji.com/rss/ranking.rdf"
+    },
     "jijiflash": {
         "basisurl": "https://www.jiji.com",
         "enable": false,
@@ -30,16 +30,49 @@
         "titlexpath": "/html/head/meta[@name='title']/@content",
         "urlxpath": "/html/body/div[@id='Contents']//div[@id='ContentsInner']//div[@id='Main']//div[contains(@class, 'MainInner Individual')]//article//div[contains(@class, 'ArticleText clearfix')]//p[@class='ArticleTextTab']"
     },
-    "key": "",
-    "kyodo": true,
+    "kyodo": {
+        "enable": true,
+        "newsonly": true,
+        "rss": "https://www.kyodo.co.jp/news/feed/"
+    },
     "logfile": "/var/log/qNewsFlash_log.json",
-    "mail": "",
     "maxpara": "100",
-    "newsapi": false,
-    "requesturl": "",
-    "reuters": true,
-    "shiftjis": true,
-    "subject": "",
+    "newsapi": {
+        "api": "",
+        "enable": false,
+        "exclude": [
+            "Kbc.co.jp",
+            "Sponichi.co.jp",
+            "Bunshun.jp",
+            "Famitsu.com",
+            "Sma.co.jp",
+            "Oricon.co.jp",
+            "Jleague.jp",
+            "YouTube"
+        ],
+        "rss": "https://newsapi.org/v2/top-headlines?country=jp&apiKey="
+    },
+    "reuters": {
+        "enable": false,
+        "paraxpath": "/html/head/meta[@name='description']/@content",
+        "rss": "https://assets.wor.jp/rss/rdf/reuters/top.rdf"
+    },
+    "thread": {
+        "bbs": "",
+        "chtt": false,
+        "expiredelement": "指定されたスレッドは存在しません",
+        "expiredxpath": "/html/head/title",
+        "from": "",
+        "key": "",
+        "mail": "",
+        "max": 1000,
+        "requesturl": "",
+        "shiftjis": true,
+        "subject": "ニュースを貼るスレ - %t",
+        "threadtitle": "",
+        "threadurl": "",
+        "threadxpath": "/html/body/div/dl[@class='thread']/div/@id"
+    },
     "tokyonp": {
         "enable": false,
         "jsonpath": "/html/head/script[@type='application/ld+json']",

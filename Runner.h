@@ -45,28 +45,61 @@ private:  // Variables
     bool                                    m_AutoFetch;        // ワンショット機能の有効 / 無効
                                                                 // メンバ変数m_intervalの値を使用して自動的にニュース記事を取得するかどうか
 
-#ifdef qNewsFlash_0_0
+#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR < 1)
     QString                                 m_WriteFile;        // スレッド書き込み用のJSONファイルのパス
 #endif
 
-    QString                                 m_LogFile;          // スレッド書き込み済みのJSONファイルのパス
-                                                                // qNewsFlash.jsonファイルに設定を記述する
-                                                                // デフォルト : /var/log/qNewsFlash_log.json
+    // インターバルタイマ
+    // Systemdサービスで起動している場合に使用する
     QTimer                                  m_timer;            // ニュース記事を取得するためのインターバル時間をトリガとするタイマ
     QTimer                                  m_JiJiTimer;        // 時事ドットコムの速報記事を取得するためのインターバル時間をトリガとするタイマ
     unsigned long long                      m_interval;         // ニュース記事を取得する時間間隔
     unsigned long long                      m_JiJiinterval;     // 時事ドットコムから速報ニュースを取得する時間間隔
+
+    // News API (ニュースサイト)
     bool                                    m_bNewsAPI;         // News APIからニュース記事を取得するかどうか
+    QString                                 m_API;              // News APIからニュース記事を取得するためのキー
+    QString                                 m_NewsAPIRSS;       // News APIからニュース記事を取得するためのRSS (URL)
+    QStringList                             m_ExcludeMedia;     // News APIからニュース記事を取得する場合において、除外するメディアのURL
+
+    // 時事通信および時事通信の速報 (時事ドットコム) (ニュースサイト)
     bool                                    m_bJiJi;            // 時事ドットコムからニュース記事を取得するかどうか
+    QString                                 m_JiJiRSS;          // 時事ドットコムからニュース記事を取得するためのRSS (URL)
     bool                                    m_bJiJiFlash;       // 時事ドットコムから速報ニュースを取得するかどうか
+    JIJIFLASHINFO                           m_JiJiFlashInfo;    // 時事ドットコムの速報ニュースの取得に必要な情報
+
+    // 共同通信 (ニュースサイト)
     bool                                    m_bKyodo;           // 共同通信からニュース記事を取得するかどうか
+    QString                                 m_KyodoRSS;         // 共同通信からニュース記事を取得するためのRSS (URL)
+    bool                                    m_NewsOnly;         // 共同通信から取得するニュース記事の種類をニュースのみに絞るかどうか
+                                                                // ニュース以外の記事では、ビジネス関連やライフスタイル等の記事がある
+
+    // 朝日新聞デジタル (ニュースサイト)
     bool                                    m_bAsahi;           // 朝日新聞デジタルからニュース記事を取得するかどうか
+    QString                                 m_AsahiRSS;         // 朝日新聞デジタルからニュース記事を取得するためのRSS (URL)
+
+    // CNET Japan (ニュースサイト)
     bool                                    m_bCNet;            // CNET Japanからニュース記事を取得するかどうか
+    QString                                 m_CNETRSS;          // CNET Japanからニュース記事を取得するためのRSS (URL)
+    QString                                 m_CNETParaXPath;    // CNET Japanからニュース記事の概要を取得するためのXPath式
+                                                                // RSSにあるニュース記事の概要欄には不要な情報が多いため、
+                                                                // 該当するニュース記事のURLから記事の概要のみを抽出している
+
+    // ハンギョレ新聞 (ニュースサイト)
     bool                                    m_bHanJ;            // ハンギョレジャパンからニュース記事を取得するかどうか
+    QString                                 m_HanJRSS;          // ハンギョレジャパンからニュース記事の概要を取得するためのRSS (URL)
+    QString                                 m_HanJTopURL;       // ハンギョレジャパンのトップページのURL
+                                                                // ハンギョレジャパンでは、現在、トップページを基準にニュース記事のURLが存在する
+
+    // ロイター通信 (ニュースサイト)
     bool                                    m_bReuters;         // ロイター通信からニュース記事を取得するかどうか
+    QString                                 m_ReutersRSS;       // ロイター通信からニュース記事の概要を取得するためのRSS (URL)
+    QString                                 m_ReutersParaXPath; // ロイター通信からニュース記事の概要を取得するためのXPath式
+                                                                // RSSにあるニュース記事の概要欄の値が空欄のため、
+                                                                // 該当するニュース記事のURLから記事の概要のみを抽出している
+
+    // 東京新聞 (ニュースサイト)
     bool                                    m_bTokyoNP;         // 東京新聞からニュース記事を取得するかどうか
-    QString                                 m_API;              // News APIのキー
-    QStringList                             m_ExcludeMedia;     // News APIからのニュース記事において、除外するメディアのURL
     QString                                 m_TokyoNPTopURL,    // 東京新聞のトップページのURL
                                                                 // 東京新聞では、現在、トップページを基準にニュース記事のURLが存在する
                                             m_TokyoNPFetchURL,  // 東京新聞からニュース記事を取得するページのURL
@@ -76,11 +109,8 @@ private:  // Variables
                                             m_TokyoNPThumb,     // 東京新聞のヘッドライン取得用XPath
                                             m_TokyoNPNews,      // 東京新聞のその他ニュース記事の取得用XPath
                                             m_TokyoNPJSON;      // 各ニュース記事の情報を取得するためのXPath
-    long long                               m_MaxParagraph;     // 本文の一部を抜粋する場合の最大文字数
-    int                                     m_WithinHours;      // 公開日がn時間前以内のニュース記事を取得する
-    QString                                 m_LastUpdate;       // 最後にニュース記事群を取得した日付 (フォーマット : yyyy/M/d)
-    bool                                    m_changeTitle;      // スレッドのタイトルを変更するかどうか
-                                                                // 防弾嫌儲およびニュース速報(Libre)等のスレッドのタイトルが変更できる掲示板で使用可能
+
+    // 各ニュースサイトからニュース記事を取得するためのネットワークオブジェクト
     std::unique_ptr<QNetworkAccessManager>  manager;            // ニュース記事を取得するためのネットワークオブジェクト
     QNetworkReply                           *m_pReply;          // News API用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyJiJi;      // 時事ドットコム用HTTPレスポンスのオブジェクト
@@ -88,23 +118,38 @@ private:  // Variables
     QNetworkReply                           *m_pReplyAsahi;     // 朝日新聞デジタル用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyCNet;      // CNET用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyHanJ;      // ハンギョレジャパン用HTTPレスポンスのオブジェクト
-    QNetworkReply                           *m_pReplyReuters;         // ロイター通信用HTTPレスポンスのオブジェクト
-    QList<Article>                          m_BeforeWritingArticles;  // Webから取得したニュース記事群
-    QList<Article>                          m_WrittenArticles;        // スレッド書き込み済みの記事群のログ
+    QNetworkReply                           *m_pReplyReuters;   // ロイター通信用HTTPレスポンスのオブジェクト
+
+    // ニュース記事群に関する情報
+    QList<Article>                          m_BeforeWritingArticles;  // 各ニュースサイトから一時的に取得したニュース記事群 (書き込む前のニュース記事群のこと)
+    QList<Article>                          m_WrittenArticles;        // スレッドに書き込み済みのニュース記事群 (ログファイルに保存されているニュース記事群のこと)
+
+    // スレッドに関する情報
+    THREAD_INFO                             m_ThreadInfo;       // 記事を書き込むスレッドの情報
+    bool                                    m_changeTitle;      // スレッドのタイトルを変更するかどうか
+                                                                // 防弾嫌儲およびニュース速報(Libre)等のスレッドのタイトルが変更できる掲示板でのみ使用可能
     QString                                 m_RequestURL,       // 記事を書き込むためのPOSTデータを送信するURL
-                                            m_ThreadURL,        // 掲示板のスレッドパス
+                                            m_ThreadURL,        // 書き込むスレッドのURL
+                                            m_ThreadTitle,      // 書き込み済みのスレッドのタイトル
                                             m_ThreadXPath;      // スレッドのレス数を取得するためのXPath
     int                                     m_maxThreadNum;     // スレッドの最大レス数
-    THREAD_INFO                             m_ThreadInfo;       // 記事を書き込むスレッドの情報
-    JIJIFLASHINFO                           m_JiJiFlashInfo;    // 時事ドットコムの速報ニュースの取得に必要な情報
+    QString                                 m_ExpiredElement,   // スレッドが落ちた時のスレッドタイトル名 (現在は未使用)
+                                            m_ExpiredXpath;     // スレッドが落ちた時のスレッドタイトル名を取得するXPath
+
+    // その他設定ファイルに関する情報
+    long long                               m_MaxParagraph;     // 本文の一部を抜粋する場合の最大文字数
+    int                                     m_WithinHours;      // 公開日がN時間前以内のニュース記事を取得する
+    QString                                 m_LastUpdate;       // 最後にニュース記事群を取得した日付 (フォーマット : yyyy/M/d)
+    QString                                 m_LogFile;          // スレッドに書き込み済みのニュース記事を保存するJSONファイルのパス
+                                                                // qNewsFlash.jsonファイルに設定を記述する
+                                                                // デフォルト : /var/log/qNewsFlash_log.json
 
 public:  // Variables
 
 private:  // Methods
     int            getConfiguration(QString &filepath);         // このソフトウェアの設定ファイルの情報を取得
-    [[maybe_unused]] void        GetOption();                   // コマンドラインオプションの取得 (現在は未使用)
 
-#ifdef qNewsFlash_0_0
+#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR < 1)
     int         setLogFile();                                   // このソフトウェアのログ情報を保存するファイルのパスを設定
                                                                 // ログ情報とは、本日の書き込み済みのニュース記事群を指す
 #endif
@@ -132,11 +177,13 @@ private:  // Methods
                                        QString title);
     Article        selectArticle();                             // 取得したニュース記事群からランダムで1つを選択
     int            checkLastThreadNum();                        // 書き込むスレッドのレス数が上限に達しているかどうかを確認
-    int            UpdateThreadJson();                          // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+    int            CompareThreadTitle(const QUrl &url,          // !chttコマンドでスレッドのタイトルが正常に変更されているかどうかを確認
+                                      const QString &title);    // !chttコマンドは、防弾嫌儲系の掲示板のみ使用可能
+    int            UpdateThreadJson(const QString &title);      // スレッド情報 (スレッドのタイトル、スレッドのURL、スレッド番号) を設定ファイルに保存
     int            writeLog(Article &article);                  // 書き込み済みのニュース記事をJSONファイルに保存
     int            updateDateJson(const QString &currentDate);  // 最後にニュース記事を取得した日付を設定ファイルに保存 (フォーマット : "yyyy/M/d")
 
-#ifdef qNewsFlash_0_0
+#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR < 1)
     int            writeJSON(Article &article);                 // 選択したニュース記事をJSONファイルに保存
     int            truncateJSON();                              // スレッド書き込み用のJSONファイルの内容を空にする
 #endif

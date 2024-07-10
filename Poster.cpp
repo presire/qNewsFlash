@@ -331,7 +331,7 @@ QString Poster::urlEncode(const QString &originalString)
     }
 
     QString encodedString = originalString;
-    for (int i = 0; i < toEncode.size(); ++i) {
+    for (int i = 0; i < toEncode.size(); i++) {
         encodedString.replace(toEncode[i], encoded[i]);
     }
 

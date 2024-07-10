@@ -12,23 +12,45 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 
 * News API  
   ただし、無料版のNews APIはニュース記事が1日遅れのため、デフォルトでは無効です。  
-  有料版で最も安いプランであるNews APIビジネスについては、月額$449となっております。
+  有料版で最も安いプランであるNews APIビジネスについては、月額$449となっております。  
+
 * 時事ドットコム  
+
 * 時事ドットコム (速報ニュース)  
-  XPath式を使用して速報ニュースを取得しています。  
-  <u>速報ニュースは、他のニュース記事とは別に書き込みされます。</u>  
+  XPath式を使用して速報ニュース全体を取得しています。  
+  <u>**速報ニュースは、他のニュース記事とは別に書き込みされます。**</u>  
+  <br>
+  <u>※注意</u>  
+  <u>XPath式を使用しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
+
 * 共同通信  
+
 * 朝日新聞デジタル  
   ただし、RSSフィードに掲載されている記事には有料記事が多いため、デフォルトでは無効です。  
+
 * CNET Japan  
+  ニュース記事の概要を取得するためにXPath式を使用しています。  
+  <br>
+  <u>※注意</u>  
+  <u>XPath式を一部使用しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
+
 * ハンギョレ新聞  
+
 * ロイター通信  
+  ニュース記事の概要を取得するためにXPath式を使用しています。  
+  <br>
+  <u>※注意</u>  
+  <u>XPath式を一部使用しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
+
 * 東京新聞  
-  XPath式を使用してニュース記事を取得しています。  
+  XPath式を使用してニュース記事全体を取得しています。  
+  <br>
+  <u>※注意</u>  
+  <u>XPath式を使用しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
 
 <br>
 
-**このソフトウェアを動作させるには、Qt 5.15 (Core、Network) および libxml 2.0が必要となります。**  
+**本ソフトウェアを動作させるには、Qt 5.15 (Core、Network) および libxml 2.0が必要となります。**  
 **Qt 6を使用してビルドおよび動作させることができる可能性もありますが、確認はしておりませんのでご注意ください。**  
 <br>
 
@@ -41,20 +63,25 @@ Raspberry Pi上での動作は確認済みです。
 
 **注意：**  
 **version 0.1.0以降、0ch系の掲示板に書き込めるようになりました。**  
-**ただし、新規スレッドを立てる機能はありませんのでご注意ください。**  
 
-**新規スレッドを自動的に作成する機能は、version 0.3.0以降に導入する予定です。**  
+**新規スレッドを自動的に作成する機能は、version 0.3.0で追加されました。**  
 **この機能は、ニュース記事を書き込んでいるスレッドのレス数が上限に達した時にスレッドを新規作成するものです。**  
 
-**また、ご要望があれば、逐次開発を進めていく予定です。**  
+<u>**レス数の上限は、設定ファイルの<code>max</code>値を指定してください。**</u>  
+
+**version 0.3.0以降の設定ファイル (JSONファイル) は、version 0.2.4以前の設定ファイルと構造が異なります。**  
+**そのため、以前のバージョンの設定ファイルをversion 0.3.0以降で使い回すことが出来ないことに注意してください。**  
+
+**ご要望があれば、逐次開発を進めていく予定です。**  
 <br>
 <br>
 
 # 1. ビルドに必要なライブラリをインストール  
 <br>
 
-* Qt5 Core
-* Qt5 Network
+* Qt5 Core  
+* Qt5 Gui  
+* Qt5 Network  
   * <https://www.qt.io/>  
   * qNewsFlashは、Qtライブラリを使用しています。
   * 本ソフトウェアで使用しているQtライブラリは、LGPL v3オープンソースライセンスの下で利用可能です。  
@@ -62,7 +89,7 @@ Raspberry Pi上での動作は確認済みです。
     <I>**LibraryLicenses/Qt/LICENSE.LGPLv3**</I>  
 <br>
 
-* libxml 2.0
+* libxml 2.0  
   * <https://gitlab.gnome.org/GNOME/libxml2>  
   * qNewsFlashは、libxml 2.0を使用しています。  
   * libxml 2.0は、MITライセンスの下で利用可能です。  
@@ -82,7 +109,7 @@ Raspberry Pi上での動作は確認済みです。
     sudo zypper update  
     sudo zypper install coreutils make cmake gcc gcc-c++ libxml2-devel \  
                         libqt5-qtbase-common-devel libQt5Core-devel    \  
-                        libQt5Network-devel  
+                        libQt5Gui-devel libQt5Network-devel  
 
     # Debian GNU/Linux, Raspberry Pi OS  
     sudo apt update && sudo apt upgrade  
@@ -217,7 +244,7 @@ Cronを使用して本ソフトウェアを連携する場合は、設定ファ�
 <br>
 
 以下の例は、7:00から22:00まで1時間ごとに本ソフトウェアを実行する設定例です。  
-また、時事ドットコムから速報記事を7:00から22:00まで10分ごとに取得しています。  
+また、時事ドットコムから速報ニュース記事を10分ごとに取得しています。  
 
 この例では、本ソフトウェアは/usr/local/bin/qNewsFlashにインストールされています。  
 
@@ -227,8 +254,11 @@ Cronを使用して本ソフトウェアを連携する場合は、設定ファ�
     sudo crontab -e  
 <br>
 
+    # 時事ドットコムの速報ニュース以外のニュース記事を取得するCron  
     0    7-22 * * * /usr/local/bin/qNewsFlash --sysconf=/tmp/qNewsFlash.json  
-    */10 7-22 * * * /usr/local/bin/qNewsFlash --sysconf=/tmp/JiJiFlashOnly.json  
+
+    # 時事ドットコムの速報ニュースのみを取得するCron  
+    */10 * * * * /usr/local/bin/qNewsFlash --sysconf=/tmp/JiJiFlashOnly.json  
 <br>
 
 ## 2.5 ワンショット機能とSystemdサービス
@@ -246,14 +276,15 @@ qnewsflash.serviceファイルを開いて、<code>[Service]</code>セクショ�
 <br>
 
 **Systemdサービスの設定例**  
-  [Service]  
-  Type=oneshot  
-  ExecStartPre=/bin/sleep 30
-  ExecStart=/<qNewsFlashのインストールディレクトリ>/bin/qNewsFlash --sysconf=<qNewsFlash.jsonのパス>  
-  ExecReload=/bin/kill -HUP  $MAINPID  
-  #ExecStop=/bin/kill   -TERM $MAINPID  
-  PIDFile=<qNewsFlash.pidのパス>  
-  Restart=no  
+
+    [Service]  
+    Type=oneshot  
+    ExecStartPre=/bin/sleep 30
+    ExecStart=/<qNewsFlashのインストールディレクトリ>/bin/qNewsFlash --sysconf=<qNewsFlash.jsonのパス>  
+    ExecReload=/bin/kill -HUP  $MAINPID  
+    #ExecStop=/bin/kill   -TERM $MAINPID  
+    PIDFile=<qNewsFlash.pidのパス>  
+    Restart=no  
 
 <br>
 <br>
@@ -377,58 +408,174 @@ Systemdサービスを使用する場合は、<I>**ExecStart**</I> キーの値�
 qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、  
 取得するニュースサイトの有無、更新時間の間隔、取得したニュース記事を書き込むためのファイル、ログファイルのパス等が設定できます。  
 
-この設定ファイルがあるデフォルトのディレクトリは、<I>**/etc/qNewsFlash/qNewsFlash.json**</I> です。  
-<code>cmake</code>コマンドの実行時にディレクトリを変更することもできます。  
+この設定ファイルがあるデフォルトのパスは、<I>**/etc/qNewsFlash/qNewsFlash.json**</I> です。  
+これは、<code>cmake</code>コマンドの実行時にディレクトリを変更することもできます。  
 <br>
 
 各設定の説明を記載します。  
 <br>
 
 * newsapi  
-  デフォルト値 : <code>false</code>  
-  News APIからニュースを取得するかどうかを指定します。  
-  無料版のNews APIは、ニュース記事が1日遅れのため、デフォルトでは無効です。  
-  なお、有料版のNews APIビジネスについては、月額$449となっております。  
-  <br>
-* api  
-  デフォルト値 : 空欄  
-  News APIからニュースを取得する場合、APIキーが必要となります。  
-  そのAPIキーを指定します。  
-  <br>
-* exclude  
-  デフォルト値 : <code>["Kbc.co.jp", "Sponichi.co.jp", "Bunshun.jp", "Famitsu.com", "Sma.co.jp",  "Oricon.co.jp", "Jleague.jp", "YouTube"]</code>  
-  News APIから取得するニュース記事において、除外するメディアを指定します。  
-  <br>
+  * enable  
+    デフォルト値 : <code>false</code>  
+    News APIからニュースを取得するかどうかを指定します。  
+    無料版のNews APIは、ニュース記事が1日遅れのため、デフォルトでは無効です。  
+    なお、有料版のNews APIビジネスについては、月額$449となっております。  
+    <br>
+  * api  
+    デフォルト値 : 空欄  
+    News APIからニュースを取得する場合、APIキーが必要となります。  
+    そのAPIキーを指定します。  
+    <br>
+    News APIのキーを取得するには、公式Webサイト (https://newsapi.org) にアクセスしてアカウントを作成する必要があります。  
+    <br>
+  * exclude  
+    デフォルト値 : <code>["Kbc.co.jp", "Sponichi.co.jp", "Bunshun.jp", "Famitsu.com", "Sma.co.jp",  "Oricon.co.jp", "Jleague.jp", "YouTube"]</code>  
+    News APIから取得するニュース記事において、除外するメディアを指定します。  
+    <br>
+  * rss  
+    デフォルト値 : <code>"https://newsapi.org/v2/top-headlines?country=jp&apiKey="</code>  
+    News APIのRSSのURLを指定します。  
+    <br>
 * jiji  
-  デフォルト値 : <code>true</code>  
-  時事ドットコムからニュースを取得するかどうかを指定します。  
-  デフォルトは有効です。  
+  * enable  
+    デフォルト値 : <code>true</code>  
+    時事ドットコムからニュースを取得するかどうかを指定します。  
+    デフォルトは有効です。  
   <br>
+  * rss  
+    デフォルト値 : <code>"https://www.jiji.com/rss/ranking.rdf"</code>  
+    時事ドットコムのRSSのURLを指定します。  
+    <br>
+* jijiflash  
+  * enable  
+    デフォルト値 : <code>false</code>  
+    時事通信から速報ニュースを取得するかどうかを指定します。  
+    速報ニュースは、他のニュース記事とは別に書き込みされます。  
+    デフォルトは無効です。  
+    <br>
+  * interval  
+    デフォルト値 : <code>"600"</code>  
+    時事ドットコムから速報ニュースを取得する時間間隔 (秒) を指定します。  
+    デフォルト値は600[秒] (10分間隔で速報ニュースを取得) です。  
+    <br>
+    0を指定した場合は、強制的に600[秒] (10[分]) に指定されます。  
+    60秒未満 (1[分]未満) を指定した場合は、強制的に60[秒] (1[分]) に指定されます。  
+    0未満の値が指定された場合はエラーとなり、本ソフトウェアを終了します。  
+    <br>
+  * basisurl  
+    デフォルト値 : <code>"https://www.jiji.com"</code>  
+    時事ドットコムでは、トップページのURLを基準にニュース記事が存在します。  
+    もし、この基準が変更された場合は、この値を変更します。  
+    <br>
+  * flashurl  
+    デフォルト値 : <code>"https://www.jiji.com/jc/list?g=flash"</code>  
+    時事ドットコムから速報ニュースが存在するURLを指定します。  
+    デフォルト値は、全ての速報ニュースが存在するURLです。  
+    例えば、当日のみの速報ニュースを取得する場合は、"https://www.jiji.com/jc/list?g=flash&d=date1" を指定します。  
+    <br>
+  * flashxpath  
+    デフォルト値 : <code>"/html/body/div[@id='Contents']/div[@id='ContentsInner']/div[@id='Main']/div[contains(@class, 'MainInner mb30')]/div[contains(@class, 'ArticleListMain')]/ul[@class='LinkList']/li[1]/a/@href"</code>  
+    上記の<code>flashurl</code>に指定したURLから、公開日の最も新しい速報ニュースのURLを1件のみ取得するXPath式を指定します。  
+    <br>
+  * titlexpath  
+    デフォルト値 : <code>"/html/head/meta[@name='title']/@content"</code>  
+    上記の<code>flashxpath</code>で取得した速報ニュースのURLからタイトルを取得するXPath式を指定します。  
+    <br>
+  * paraxpath  
+    デフォルト値 : <code>"/html/head/meta[@name='description']/@content"</code>  
+    上記の<code>flashxpath</code>で取得した速報ニュースのURLから本文を取得するXPath式を指定します。  
+    <br>
+  * pubdatexpath  
+    デフォルト値 : <code>"/html/head/meta[@name='pubdate']/@content"</code>  
+    上記の<code>flashxpath</code>で取得した速報ニュースのURLから公開日を取得するXPath式を指定します。  
+    <br>
+  * urlxpath  
+    デフォルト値 : <code>"/html/body/div[@id='Contents']/div[@id='ContentsInner']/div[@id='Main']/div[contains(@class, 'MainInner Individual')]/article/div[contains(@class, 'ArticleText clearfix')]/p[@class='ArticleTextTab']"</code>  
+    上記の<code>flashxpath</code>で取得した速報ニュースのURLから、"<この速報の記事を読む>"の部分のリンクを取得するXPath式を指定します。  
+    <br>
+    このリンクが存在する場合は本記事が存在すると看做します。  
+    つまり、本記事が存在する場合は速報記事ではないものとします。  
+    <br>
 * kyodo  
-  デフォルト値 : <code>true</code>  
-  共同通信からニュースを取得するかどうかを指定します。  
-  デフォルトは有効です。  
-  <br>
+  * enable  
+    デフォルト値 : <code>true</code>  
+    共同通信からニュースを取得するかどうかを指定します。  
+    デフォルトは有効です。  
+    <br>
+  * rss  
+    デフォルト値 : <code>"https://www.kyodo.co.jp/news/feed/"</code>  
+    共同通信のRSSのURLを指定します。  
+    <br>
+  * newsonly  
+    デフォルト値 : <code>true</code>  
+    共同通信から取得するニュース記事の種類をニュースのみに絞るかどうかを指定します。  
+    ニュース以外の記事では、ビジネスやライフスタイル等の記事があります。  
+    <br>
+    デフォルトで取得する記事は、ニュースのみです。  
+    <br>
 * asahi  
-  デフォルト値 : <code>false</code>  
-  朝日新聞デジタルからニュースを取得するかどうかを指定します。  
-  RSSから取得できる朝日新聞デジタルの記事は有料記事が多いため、デフォルトは無効です。  
-  <br>
+  * enable  
+    デフォルト値 : <code>false</code>  
+    朝日新聞デジタルからニュースを取得するかどうかを指定します。  
+    RSSから取得できる朝日新聞デジタルの記事は有料記事が多いため、デフォルトは無効です。  
+    <br>
+  * rss  
+    デフォルト値 : <code>"https://www.asahi.com/rss/asahi/newsheadlines.rdf"</code>  
+    朝日新聞デジタルのRSSのURLを指定します。  
+    <br>
 * cnet  
-  デフォルト値 : <code>true</code>  
-  CNET Japanからニュースを取得するかどうかを指定します。  
-  デフォルトは有効です。  
-  <br>
+  * enable  
+    デフォルト値 : <code>true</code>  
+    CNET Japanからニュースを取得するかどうかを指定します。  
+    デフォルトは有効です。  
+    <br>
+  * rss  
+    デフォルト値 : <code>"http://feeds.japan.cnet.com/rss/cnet/all.rdf"</code>  
+    CNET JapanのRSSのURLを指定します。  
+    <br>
+  * paraxpath  
+    デフォルト値 : <code>"/html/head/meta[@property='og:description']/@content"</code>  
+    CNET JapanのRSSでは、ニュース記事の概要欄に不要な情報が多いため、  
+    該当するニュース記事のURLにアクセスして、ニュース記事の概要を抽出しています。  
+    <br>
+    その概要を取得するためのXPathを指定します。  
+    <br>
 * hanj  
-  デフォルト値 : <code>false</code>  
-  ハンギョレ新聞 ジャパンからニュースを取得するかどうかを指定します。  
-  デフォルトは無効です。  
-  <br>
+  * enable  
+    デフォルト値 : <code>false</code>  
+    ハンギョレ新聞 ジャパンからニュースを取得するかどうかを指定します。  
+    デフォルトは無効です。  
+    <br>
+  * rss  
+    デフォルト値 : <code>"https://japan.hani.co.kr/rss/"</code>  
+    ハンギョレジャパンのRSSのURLを指定します。  
+    <br>
+  * toppage  
+    デフォルト値 : <code>"https://japan.hani.co.kr"</code>  
+    ハンギョレジャパンのRSSでは、ニュース記事のリンクが基準となるページ以降のURLのみ記載されています。  
+    そのため、その基準となるURLを指定します。  
+    <br>
+    現在、ハンギョレジャパンのトップページのURLを基準にニュース記事が存在しています。  
+    もし、この基準が変更された場合は、この値を変更します。  
+    <br>
 * reuters  
-  デフォルト値 : <code>false</code>  
-  ロイター通信からニュースを取得するかどうかを指定します。  
-  デフォルトは無効です。  
-  <br>
+  * enable  
+    デフォルト値 : <code>false</code>  
+    ロイター通信からニュースを取得するかどうかを指定します。  
+    デフォルトは無効です。  
+    <br>
+  * rss  
+    デフォルト値 : <code>"https://assets.wor.jp/rss/rdf/reuters/top.rdf"</code>  
+    ロイター通信のRSSのURLを指定します。  
+    <br>
+  * paraxpath  
+    デフォルト値 : <code>"/html/head/meta[@name='description']/@content"</code>  
+    ロイター通信のRSSでは、ニュース記事の概要欄に情報が無いため、  
+    該当するニュース記事のURLにアクセスして、ニュース記事の概要を抽出しています。  
+    <br>
+    その概要を取得するためのXPathを指定します。  
+    <br>
 * tokyonp  
   * enable  
     デフォルト値 : <code>false</code>  
@@ -481,64 +628,128 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
     <br>
     **※  ただし、Webサイトの構成が変更された場合は、それに合わせてこの値を変更する必要があります。**  
     <br>
-  <br>
-* jijiflash  
-  * enable  
+* thread  
+  * subject  
+    デフォルト値 : <code>"ニュースを貼るスレ - %t"</code>  
+    スレッドを立てる時のタイトルを指定します。　　
+    <br>
+    "subject"キーの値が空欄の場合、ニュース記事のタイトルをスレッドのタイトルにします。  
+    <br>
+    また、"subject"キーの値に<code>%t</code>トークンが存在する場合は、<code>%t</code>の部分をニュース記事のタイトルに置き換えます。  
+    <br>
+    <code>%t</code>トークンの使用例 :  
+    <code>"ニュースを貼るスレ - %t"</code>の場合、  
+    スレッドのタイトル名は<code>"ニュースを貼るスレ - <ニュース記事のタイトル>"</code>となります。  
+    <br>
+    POSTデータとして送信します。  
+    <br>
+  * from  
+    デフォルト値 : 空欄  
+    フォームの名前欄に入力する文字列を指定します。
+    POSTデータとして送信します。  
+    <br>
+  * mail  
+    デフォルト値 : 空欄  
+    フォームのメール欄に入力する文字列を指定します。  
+    POSTデータとして送信します。  
+    <br>
+  * bbs  
+    デフォルト値 : 空欄  
+    掲示板のBBS名を指定します。  
+    POSTデータとして送信します。  
+    <br>
+    Libre掲示板の設定例 (2024年7月 現在) :  <code>news1</code>  
+    <br>
+    <u>書き込み時に必須です。</u>  
+    <br>
+  * key  
+    デフォルト値 : 空欄  
+    ニュース記事を書き込むスレッド番号を指定します。  
+    POSTデータとして送信します。  
+    <br>
+    <u>**スレッドを新規作成した時、この値は自動的に更新されます。**</u>  
+    <br>
+    <u>既存のスレッドに書き込む場合は必須です。</u>  
+    <br>
+  * requesturl  
+    デフォルト値 : 空欄  
+    ニュース記事を書き込むため、POSTデータを送信するURLを指定します。  
+    <br>
+    0ch系の場合は、以下に示す場合が多いです。  
+    * <code>**http(s)://<ドメイン名>/test/bbs.cgi**</code>  
+    * <code>**http(s)://<ドメイン名>/test/bbs.cgi?guid=ON**</code>  
+    <br>
+    
+    <u>書き込み時に必須です。</u>  
+    <br>
+  * threadtitle  
+    デフォルト値 : 空欄  
+    現在、書き込んでいるスレッドのタイトルが自動的に入力されます。  
+    スレッドを新規作成した時、あるいは、<code>!chtt</code>コマンドでタイトルが変更された時、この値は自動的に更新されます。  
+    <br>
+    <u>ユーザはこの値を書き換えないようにしてください。</u>  
+    <br>
+  * threadurl  
+    デフォルト値 : 空欄  
+    現在、書き込んでいるスレッドのURLが自動的に入力されます。  
+    <br>
+    <u>**スレッドを新規作成した時、この値は自動的に更新されます。**</u>  
+    <br>
+    Libre掲示板の設定例 (2024年7月 現在) :  
+    <code>"https://bbs.boumou.li/test/read.cgi/news1/1717141204"</code>  
+    <br>
+  * max  
+    デフォルト値 : 1000  
+    スレッドに書き込みできる最大のレス数を指定する。  
+    <br>
+  * threadxpath  
+    デフォルト値 : <code>"/html/body/div/dl[@class='thread']/div/@id"</code>  
+    スレッドのレス数を取得するXPathを指定します。  
+    <br>
+    ex0ch掲示板の設定例 (2024年7月 現在) :  
+    <code>"/html/body/div/dl[@class='thread']/div/@id"</code>  
+    <br>
+    Libre掲示板の設定例 (2024年7月 現在) :  
+    <code>"/html/body/main/div[@class='container-fluid maxWidth']/div[@class='card border-0 py-0'][1]/div[@class='card-body-color bg-color px-2 pt-2']/dl[@class='thread']/article/dt/a"</code>  
+    <br>
+  * expiredxpath  
+    デフォルト値 : <code>"/html/head/title"</code>  
+    スレッドのタイトル名を取得するXPathを指定します。  
+    <br>
+    本ソフトウェアでは、この設定値を使用して、スレッドが生存あるいは落ちているかどうかを判断しています。  
+    <br>
+  * expiredelement  
+    デフォルト値 : <code>"指定されたスレッドは存在しません"</code>  
+    <u>**現在、この設定は使用しておりません。**</u>  
+    <br>
+    スレッドが落ちている状態のタイトル名を指定します。  
+    この設定値を使用して、スレッドが生存あるいは落ちているかどうかを判断します。  
+    <br>
+    ex0ch掲示板の設定例 (2024年7月 現在) :  
+    <code>"指定されたスレッドは存在しません"</code>  
+    <br>
+    Libre掲示板の設定例 (2024年7月 現在) :  
+    <code>"スレが存在しません。"</code>  
+    <br>
+  * shiftjis  
+    デフォルト値 : <code>true</code>  
+    POSTデータの文字コードをShift-JISに変換するかどうかを指定します。  
+    0ch系は、Shift-JISを指定 (<code>**true**</code>) することを推奨します。  
+    <br>
+  * chtt  
     デフォルト値 : <code>false</code>  
-    時事通信から速報ニュースを取得するかどうかを指定します。  
-    速報ニュースは、他のニュース記事とは別に書き込みされます。  
-    デフォルトは無効です。  
+    スレッドタイトルをニュース記事のタイトルに変更します。  
+    ニュース記事のタイトルの先頭に!chttという文字列を付加して、POSTデータとして送信します。  
     <br>
-  * interval  
-    デフォルト値 : <code>"600"</code>  
-    時事ドットコムから速報ニュースを取得する時間間隔 (秒) を指定します。  
-    デフォルト値は600[秒] (10分間隔で速報ニュースを取得) です。  
-    <br>
-    0を指定した場合は、強制的に600[秒] (10[分]) に指定されます。  
-    60秒未満 (1[分]未満) を指定した場合は、強制的に60[秒] (1[分]) に指定されます。  
-    0未満の値が指定された場合はエラーとなり、本ソフトウェアを終了します。  
-    <br>
-  * basisurl  
-    デフォルト値 : <code>"https://www.jiji.com"</code>  
-    時事ドットコムでは、トップページのURLを基準にニュース記事が存在します。  
-    もし、この基準が変更された場合は、この値を変更します。  
-    <br>
-  * flashurl  
-    デフォルト値 : <code>"https://www.jiji.com/jc/list?g=flash"</code>  
-    時事ドットコムから速報ニュースが存在するURLを指定します。  
-    デフォルト値は、全ての速報ニュースが存在するURLです。  
-    例えば、当日のみの速報ニュースを取得する場合は、"https://www.jiji.com/jc/list?g=flash&d=date1" を指定します。  
-    <br>
-  * flashxpath  
-    デフォルト値 : <code>"/html/body/div[@id='Contents']/div[@id='ContentsInner']/div[@id='Main']/div[contains(@class, 'MainInner mb30')]/div[contains(@class, 'ArticleListMain')]/ul[@class='LinkList']/li[1]/a/@href"</code>  
-    上記の<code>flashurl</code>に指定したURLから、公開日の最も新しい速報ニュースのURLを1件のみ取得するXPath式を指定します。  
-    <br>
-  * titlexpath  
-    デフォルト値 : <code>"/html/head/meta[@name='title']/@content"</code>  
-    上記の<code>flashxpath</code>で取得した速報ニュースのURLからタイトルを取得するXPath式を指定します。  
-    <br>
-  * paraxpath  
-    デフォルト値 : <code>"/html/head/meta[@name='description']/@content"</code>  
-    上記の<code>flashxpath</code>で取得した速報ニュースのURLから本文を取得するXPath式を指定します。  
-    <br>
-  * pubdatexpath  
-    デフォルト値 : <code>"/html/head/meta[@name='pubdate']/@content"</code>  
-    上記の<code>flashxpath</code>で取得した速報ニュースのURLから公開日を取得するXPath式を指定します。  
-    <br>
-  * urlxpath  
-    デフォルト値 : <code>"/html/body/div[@id='Contents']/div[@id='ContentsInner']/div[@id='Main']/div[contains(@class, 'MainInner Individual')]/article/div[contains(@class, 'ArticleText clearfix')]/p[@class='ArticleTextTab']"</code>  
-    上記の<code>flashxpath</code>で取得した速報ニュースのURLから、"<この速報の記事を読む>"の部分のリンクを取得するXPath式を指定します。  
-    <br>
-    このリンクが存在する場合は本記事が存在すると看做します。  
-    つまり、本記事が存在する場合は速報記事ではないものとします。  
+    <u>防弾嫌儲系の掲示板において、<code>!chtt</code>コマンドが使用できる場合に有効です。</u>  
     <br>
 * autofetch  
   デフォルト値 : <code>true</code>  
-  タイマ (<code>interval</code>キーの値を使用) を使用して、ニュース記事を自動取得するかどうかを指定します。  
+  Systemdサービスおよびタイマ (<code>interval</code>キーの値を使用) を使用して、ニュース記事を自動取得するかどうかを指定します。  
   <br>
   Cronを使用して本ソフトウェアをワンショットで実行する場合は、この値を<code>false</code>に指定します。  
-  つまり、<code>false</code>に指定する場合、本ソフトウェアをワンショットで実行して、ニュース記事を1度だけ自動取得することができます。  
-  例えば、Systemdサービスが使用できない環境 (Cronのみが使用できる環境) 等で使用します。  
+  つまり、<code>false</code>に指定する場合、本ソフトウェアをワンショットで実行して、ニュース記事を1度だけ取得することができます。  
+  例えば、Systemdサービスが使用できない環境 (Cronのみが使用できる環境) では<code>false</code>を指定します。  
   <br>
 * maxpara  
   デフォルト値 : <code>"100"</code>  
@@ -560,18 +771,14 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   <u>その場合、大きめの数値を指定したほうがよい可能性があります。</u>  
   <br>
 * withinhours  
-  デフォルト値 : <code>"0"</code> (無効)  
+  デフォルト値 : <code>"0"</code>　(当日の記事を取得)  
   <br>
   例えば、公開日が3時間前以内のニュース記事を取得する場合、設定ファイル qNewsFlash.jsonの<code>withinhours</code>キーの値を<code>"3"</code>に指定します。  
   なお、<code>withinhours</code>キーに指定できる値は、<code>"0"</code>から<code>"24"</code>までです。  
-  <code>"0"</code>、<code>"25"</code>以上の値、その他の値を指定した場合はこの機能は無効となります。  
   <br>
-* <del>writefile</del> <u>**(version 0.1.0以降は無効)**</u>  
-  デフォルト値 : <code>"/tmp/qNewsFlashWrite.json"</code>  
-  このソフトウェアは、各ニュースサイトからニュース記事群からニュース記事を自動的に1つ選択します。  
-  このファイルは、その選択された1つのニュース記事の情報が記載されています。  
+  <code>"0"</code>を指定する場合、当日のニュース記事のみを取得します。  
   <br>
-  このファイルを利用して、ユーザは掲示板等に自動的に書き込むようなスクリプトを作成することができます。  
+  <code>"0"</code>未満の値や<code>"25"</code>以上の値を指定した場合も、当日のニュース記事のみを取得します。  
   <br>
 * logfile  
   デフォルト値 : <code>"/var/log/qNewsFlash_log.json"</code>  
@@ -587,38 +794,6 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   <br>
   <u>ユーザはこの値を書き換えないようにしてください。</u>  
   <br>
-* requesturl  
-  デフォルト値 : 空欄  
-  ニュース記事を書き込むため、POSTデータを送信するURLを指定します。  
-  <br>
-  0ch系の場合は、以下に示す場合が多いです。  
-  * <code>**http(s)://<ドメイン名>/test/bbs.cgi**</code>  
-  * <code>**http(s)://<ドメイン名>/test/bbs.cgi?guid=ON**</code>  
-  <br>
-
-  書き込み時に必須です。  
-  <br>
-* subject  
-  デフォルト値 : 空欄  
-  スレッドを立てる時のタイトルを指定します。　　
-  <br>
-  POSTデータとして送信します。  
-  <br>
-* from  
-  デフォルト値 : 空欄  
-  POSTデータとして送信します。  
-  <br>
-* mail  
-  デフォルト値 : 空欄  
-  フォームのメール欄に入力する文字列を指定します。  
-  POSTデータとして送信します。  
-  <br>
-* bbs  
-  デフォルト値 : 空欄  
-  掲示板のBBS名を指定します。  
-  POSTデータとして送信します。  
-  書き込み時に必須です。  
-  <br>
 * <del>time</del>  
   **<u>qNewsFlash 0.1.7以降、この設定は不要になりました。</u>**  
   <br>
@@ -630,24 +805,14 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   <del>掲示板によっては、この値は意味をなさない可能性があります。</del>  
   <del>POSTデータとして送信します。</del>  
   <br>
-* key  
-  デフォルト値 : 空欄  
-  ニュース記事を書き込むスレッド番号を指定します。  
-  POSTデータとして送信します。  
+* <del>writefile</del>  
+  **<u>qNewsFlash 0.1.0以降、この設定は不要になりました。</u>**  
   <br>
-  既存のスレッドに書き込む場合は必須です。   
+  <del>デフォルト値 : <code>"/tmp/qNewsFlashWrite.json"</code></del>  
+  <del>このソフトウェアは、各ニュースサイトからニュース記事群からニュース記事を自動的に1つ選択します。</del>  
+  <del>このファイルは、その選択された1つのニュース記事の情報が記載されています。</del>  
   <br>
-* chtt  
-  デフォルト値 : <code>false</code>  
-  スレッドタイトルをニュース記事のタイトルに変更します。  
-  ニュース記事のタイトルの先頭に!chttという文字列を付加して、POSTデータとして送信します。  
-  <br>
-  <u>防弾嫌儲系の掲示板において、<code>!chtt</code>コマンドが使用できる場合に有効です。</u>  
-  <br>
-* shiftjis  
-  デフォルト値 : <code>true</code>  
-  POSTデータの文字コードをShift-JISに変換するかどうかを指定します。  
-  0ch系は、Shift-JISを指定 (<code>**true**</code>) することを推奨します。  
+  <del>このファイルを利用して、ユーザは掲示板等に自動的に書き込むようなスクリプトを作成することができます。</del>  
 
 <br>
 <br>

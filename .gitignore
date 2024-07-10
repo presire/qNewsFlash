@@ -4,11 +4,11 @@ qNewsFlash/build
 qNewsFlash/qNewsFlash.pro*
 qNewsFlash/NtpTimeFetcher.cpp
 qNewsFlash/NtpTimeFetcher.h
+qNewsFlash/Runner_bak.cpp
+qNewsFlash/Runner_bak.h
 qNewsFlash/CMakeLists.txt.user
 qNewsFlash/CMakeLists.txt.user*
 qNewsFlash/qNewsFlash.json
-NtpTimeFetcher.cpp
-NtpTimeFetcher.h
 Debug
 Release
 build

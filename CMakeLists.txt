@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(qNewsFlash VERSION 0.2.4 LANGUAGES CXX)
+project(qNewsFlash VERSION 0.3.0 LANGUAGES CXX)
 
 
 # Linuxのみビルドを許可
@@ -61,11 +61,12 @@ link_directories(${LIBXML2_LIBRARY_DIRS})
 
 
 # pkg-configを使用してQtライブラリを検索
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Network)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Network)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Network)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Network)
 
 ## Qtのpkg-configファイル
-pkg_check_modules(QT_CORE     Qt${QT_VERSION_MAJOR}Core REQUIRED IMPORTED_TARGET)
+pkg_check_modules(QT_CORE     Qt${QT_VERSION_MAJOR}Core    REQUIRED IMPORTED_TARGET)
+pkg_check_modules(QT_GUI      Qt${QT_VERSION_MAJOR}Gui     REQUIRED IMPORTED_TARGET)
 pkg_check_modules(QT_NETWORK  Qt${QT_VERSION_MAJOR}Network REQUIRED IMPORTED_TARGET)
 
 ## Qt 5.15未満はビルドエラー
@@ -99,13 +100,18 @@ target_compile_definitions(qNewsFlash PRIVATE
 #endif()
 
 ## バージョンプリプロセッサを定義 (x.y)
-target_compile_definitions(qNewsFlash PRIVATE
-    -D${PROJECT_NAME}_${PROJECT_VERSION_MAJOR}_${PROJECT_VERSION_MINOR}
-)
+#target_compile_definitions(qNewsFlash PRIVATE
+#    -D${PROJECT_NAME}_${PROJECT_VERSION_MAJOR}_${PROJECT_VERSION_MINOR}
+#)
 
-## バージョンプリプロセッサを定義 (x.y.z)
+### バージョンプリプロセッサを定義 (x.y.z)
+#target_compile_definitions(qNewsFlash PRIVATE
+#    -D${PROJECT_NAME}_${PROJECT_VERSION_MAJOR}_${PROJECT_VERSION_MINOR}_${PROJECT_VERSION_PATCH}
+#)
+
 target_compile_definitions(qNewsFlash PRIVATE
-    -D${PROJECT_NAME}_${PROJECT_VERSION_MAJOR}_${PROJECT_VERSION_MINOR}_${PROJECT_VERSION_PATCH}
+    -DQNEWSFLASH_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    -DQNEWSFLASH_VERSION_MINOR=${PROJECT_VERSION_MINOR}
 )
 
 ## ARMまたはAARCH64かどうかを確認
@@ -144,6 +150,7 @@ target_include_directories(qNewsFlash PRIVATE
 
 target_link_libraries(qNewsFlash
         Qt${QT_VERSION_MAJOR}::Core
+        Qt${QT_VERSION_MAJOR}::Gui
         Qt${QT_VERSION_MAJOR}::Network
         ${LIBXML2_LIBRARIES}
 )

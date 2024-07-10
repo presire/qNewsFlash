@@ -9,6 +9,7 @@
 #include <QJsonArray>
 #include <QTimeZone>
 #include <QXmlStreamReader>
+#include <QTextDocumentFragment>
 #include <QException>
 #include <iostream>
 #include <random>
@@ -130,7 +131,7 @@ void Runner::run()
         return;
     }
 
-#ifdef qNewsFlash_0_0
+#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR < 1)
     // JSONファイル(スレッド書き込み用)のパスが空の場合は、デフォルトのパスを使用
     if (m_WriteFile.isEmpty()) {
         m_WriteFile = QString("/tmp/qNewsFlashWrite.json");
@@ -214,8 +215,7 @@ void Runner::fetch()
     // News APIの日本国内の記事を取得
     // ただし、無料版のNews APIの記事は24時間遅れであるため、News APIを使用する場合は有料版を推奨する
     if (m_bNewsAPI) {
-        QString country = "jp";
-        QUrl url(QString("https://newsapi.org/v2/top-headlines?country=%1&apiKey=%2").arg(country, m_API));
+        QUrl url(m_NewsAPIRSS.append(m_API));
 
         /// HTTPリクエストを作成して、ヘッダを設定
         QNetworkRequest request(url);
@@ -238,7 +238,7 @@ void Runner::fetch()
     // 時事ドットコムの記事を取得
     if (m_bJiJi) {
         // 時事ドットコムのRSSフィードのURLを指定
-        QUrl urlJiJi("https://www.jiji.com/rss/ranking.rdf");
+        QUrl urlJiJi(m_JiJiRSS);
 
         /// HTTPリクエストを作成して、ヘッダを設定
         QNetworkRequest requestJiJi(urlJiJi);
@@ -261,7 +261,7 @@ void Runner::fetch()
     // 共同通信の記事を取得
     if (m_bKyodo) {
         // 共同通信のRSSフィードのURLを指定
-        QUrl urlKyodo("https://www.kyodo.co.jp/news/feed/");
+        QUrl urlKyodo(m_KyodoRSS);
 
         /// HTTPリクエストを作成して、ヘッダを設定
         QNetworkRequest requestKyodo(urlKyodo);
@@ -284,7 +284,7 @@ void Runner::fetch()
     // 朝日新聞デジタルの記事を取得
     if (m_bAsahi) {
         // 朝日新聞デジタルのRSSフィードのURLを指定
-        QUrl urlAsahi("https://www.asahi.com/rss/asahi/newsheadlines.rdf");
+        QUrl urlAsahi(m_AsahiRSS);
 
         /// HTTPリクエストを作成して、ヘッダを設定
         QNetworkRequest requestAsahi(urlAsahi);
@@ -307,7 +307,7 @@ void Runner::fetch()
     // CNET Japanの記事を取得
     if (m_bCNet) {
         // CNET JapanのRSSフィードのURLを指定
-        QUrl urlCNet("http://feeds.japan.cnet.com/rss/cnet/all.rdf");
+        QUrl urlCNet(m_CNETRSS);
 
         /// HTTPリクエストを作成して、ヘッダを設定
         QNetworkRequest requestCNet(urlCNet);
@@ -330,7 +330,7 @@ void Runner::fetch()
     // ハンギョレジャパンの記事を取得
     if (m_bHanJ) {
         // ハンギョレジャパンのRSSフィードのURLを指定
-        QUrl urlHanJ("https://japan.hani.co.kr/rss/");
+        QUrl urlHanJ(m_HanJRSS);
 
         /// HTTPリクエストを作成して、ヘッダを設定
         QNetworkRequest requestHanJ(urlHanJ);
@@ -353,7 +353,7 @@ void Runner::fetch()
     // ロイター通信の記事を取得
     if (m_bReuters) {
         // ロイター通信のRSSフィードのURLを指定
-        QUrl urlReuters("https://assets.wor.jp/rss/rdf/reuters/top.rdf");
+        QUrl urlReuters(m_ReutersRSS);
 
         /// HTTPリクエストを作成して、ヘッダを設定
         QNetworkRequest requestReuters(urlReuters);
@@ -373,7 +373,7 @@ void Runner::fetch()
     // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
     if (m_stopRequested.load()) return;
 
-    // ロイター通信の記事を取得
+    // 東京新聞の記事を取得
     if (m_bTokyoNP) {
         fetchTokyoNP();
     }
@@ -420,7 +420,7 @@ void Runner::fetch()
             return;
         }
 
-#if defined(qNewsFlash_0_1) || defined(qNewsFlash_0_2)
+#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR >= 1) && (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR <= 2)
         // qNewsFlash 0.1.0から0.2.xまでの機能
 
         // スレッドのタイトルを変更するかどうか (防弾嫌儲およびニュース速報(Libre)等の掲示板で使用可能)
@@ -431,13 +431,15 @@ void Runner::fetch()
             // 既存のスレッドへの書き込みに失敗した場合
             return;
         }
-#else
-        // 今後の予定 : qNewsFlash 0.3.0以降
+#elif QNEWSFLASH_VERSION_MAJOR > 0 || (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR >= 3)
+        // qNewsFlash 0.3.0以降の機能
 
         // 指定のスレッドがレス数の上限に達して書き込めない場合、スレッドを新規作成する
         HtmlFetcher fetcher(this);
-        if (fetcher.checkUrlExistence(QUrl(m_ThreadURL))) {
-            // 設定ファイルにあるスレッドのURLが存在する場合
+        //auto iExpired = fetcher.checkUrlExistence(QUrl(m_ThreadURL), m_ExpiredElement, m_ExpiredXpath, m_ThreadInfo.shiftjis);
+        auto iExpired = fetcher.checkUrlExistence(QUrl(m_ThreadURL), m_ThreadTitle, m_ExpiredXpath, m_ThreadInfo.shiftjis);
+        if (iExpired == 0) {
+            // 設定ファイルにあるスレッドのURLが生存している場合
 
             // ニュース記事を書き込むスレッドのレス数を取得
             auto ret = checkLastThreadNum();
@@ -469,7 +471,7 @@ void Runner::fetch()
                 m_ThreadInfo.key = poster.GetNewThreadNum();
 
                 // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
-                if (UpdateThreadJson()) {
+                if (UpdateThreadJson(m_ThreadInfo.subject)) {
                     // スレッド情報の保存に失敗
                     return;
                 }
@@ -485,10 +487,28 @@ void Runner::fetch()
                     // 既存のスレッドへの書き込みに失敗した場合
                     return;
                 }
+
+                // スレッドのタイトルが正常に変更されているかどうかを確認
+                if (m_changeTitle && !CompareThreadTitle(QUrl(m_ThreadURL), title)) {
+                    // スレッドのタイトルが正常に変更された場合
+                    // スレッド情報 (スレッドのタイトル、スレッドのURL、スレッド番号) を設定ファイルに保存
+                    if (UpdateThreadJson(title)) {
+                        // スレッド情報の保存に失敗
+                        return;
+                    }
+                }
+                else {
+                    // スレッドのタイトルが変更されなかった場合
+                    // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+                    if (UpdateThreadJson(m_ThreadTitle)) {
+                        // スレッド情報の保存に失敗
+                        return;
+                    }
+                }
             }
         }
-        else {
-            // 設定ファイルにあるスレッドのURLが存在しない場合 (スレッドを新規作成する)
+        else if (iExpired == 1) {
+            // 設定ファイルにあるスレッドのURLが存在しない、または、落ちている場合 (スレッドを新規作成する)
 
             // 設定ファイルの"subject"キーの値が空欄の場合、ニュース記事のタイトルをスレッドのタイトルにする
             // "subject"キーの値に%tトークンが存在する場合はニュース記事のタイトルに置換
@@ -511,15 +531,18 @@ void Runner::fetch()
             m_ThreadInfo.key = poster.GetNewThreadNum();
 
             // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
-            if (UpdateThreadJson()) {
+            if (UpdateThreadJson(m_ThreadInfo.subject)) {
                 // スレッド情報の保存に失敗
                 return;
             }
         }
+        else {
+            return;
+        }
 
 #endif
 
-#ifdef qNewsFlash_0_0
+#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR < 1)
         // qNewsFlash 0.1.0未満の機能
         // JSONファイル(スレッド書き込み用)に書き込む
         // 該当スレッドへの書き込み処理は各自で実装する
@@ -539,7 +562,7 @@ void Runner::fetch()
             return;
         }
     }
-#ifdef qNewsFlash_0_0
+#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR < 1)
     // qNewsFlash 0.1.0未満の機能
     else {
 
@@ -824,16 +847,21 @@ void Runner::itemTagsforKyodo(xmlNode *a_node)
                         // "&#8230;"がある場合は削除
                         paragraph.replace("&#8230;", "");
 
+                        // QTextDocumentFragment::fromHtml()を使用して変換
+                        paragraph = QTextDocumentFragment::fromHtml(paragraph).toPlainText();
+
                         // 本文が指定文字数以上の場合、指定文字数分のみを抽出
                         paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
                         link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
 
-                        // ニュース記事の枠ではない場合は記事を無視
-                        if (!link.startsWith("https://www.kyodo.co.jp/news/")) {
-                            bSkipNews = true;
-                            break;
+                        if (m_NewsOnly) {
+                            // ニュース記事の枠ではない場合は該当記事を無視
+                            if (!link.startsWith("https://www.kyodo.co.jp/news/")) {
+                                bSkipNews = true;
+                                break;
+                            }
                         }
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "pubDate") == 0) {
@@ -1064,25 +1092,41 @@ void Runner::itemTagsforCNet(xmlNode *a_node)
                         title = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "description") == 0) {
-                        paragraph = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
+                        // 現在、RSSからニュース記事の概要を取得しない
+                        // 該当するニュース記事のURLにアクセスして、記事の概要を抽出する
+//                        paragraph = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
 
-                        // 不要なhtmlタグを除去
-                        static QRegularExpression re2("<br .*</a>", QRegularExpression::DotMatchesEverythingOption);
-                        paragraph.remove(re2);
+//                        // 不要なhtmlタグを除去
+//                        static QRegularExpression re2("<br .*</a>", QRegularExpression::DotMatchesEverythingOption);
+//                        paragraph.remove(re2);
 
-                        // 不要な文字を削除 (\n, \t)
-                        static QRegularExpression re1("[\t\n]", QRegularExpression::CaseInsensitiveOption);
-                        paragraph = paragraph.replace(re1, "");
+//                        // 不要な文字を削除 (\n, \t)
+//                        static QRegularExpression re1("[\t\n]", QRegularExpression::CaseInsensitiveOption);
+//                        paragraph = paragraph.replace(re1, "");
 
-                        // 不要な文字を削除 (スペース等)
-                        static QRegularExpression re3("[\\s]", QRegularExpression::CaseInsensitiveOption);
-                        paragraph = paragraph.replace(re3, "").replace(" ", "").replace("\u3000", "");
+//                        // 不要な文字を削除 (スペース等)
+//                        static QRegularExpression re3("[\\s]", QRegularExpression::CaseInsensitiveOption);
+//                        paragraph = paragraph.replace(re3, "").replace(" ", "").replace("\u3000", "");
 
-                        // 本文が指定文字数以上の場合、指定文字数分のみを抽出
-                        paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
+//                        // 本文が指定文字数以上の場合、指定文字数分のみを抽出
+//                        paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
+                        // ニュース記事のURLを取得
                         link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
+
+                        // ニュース記事のURLからHTMLタグを解析した後、記事の概要を取得して指定文字数分のみ取得
+                        QUrl url(link);
+                        HtmlFetcher fetcher(m_MaxParagraph, this);
+
+                        if (fetcher.fetch(url, true, QString(m_CNETParaXPath))) {
+                            // ニュース記事の概要の取得に失敗した場合
+                            bSkipNews = true;
+                            break;
+                        }
+
+                        // ニュース記事の概要を取得
+                        paragraph = fetcher.getParagraph();
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "date") == 0) {
                         date = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
@@ -1206,7 +1250,7 @@ void Runner::itemTagsforHanJ(xmlNode *a_node)
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
                         link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
-                        link = QString("https://japan.hani.co.kr") + link;
+                        link = m_HanJTopURL + link;
 
                         // ニュース記事のURLからHTMLタグを解析した後、本文を取得して指定文字数分のみ取得 (現在は使用しない)
 //                        QUrl url(link);
@@ -1601,7 +1645,7 @@ void Runner::JiJiFlashfetch()
         return;
     }
 
-#if defined(qNewsFlash_0_1) || defined(qNewsFlash_0_2)
+#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR >= 1) && (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR <= 2)
     // qNewsFlash 0.1.0から0.2.xまでの機能
 
     // スレッドのタイトルを変更するかどうか (防弾嫌儲およびニュース速報(Libre)等の掲示板で使用可能)
@@ -1612,20 +1656,22 @@ void Runner::JiJiFlashfetch()
         // 既存のスレッドへの書き込みに失敗した場合
         return;
     }
-#else
-    // 今後の予定 : qNewsFlash 0.3.0以降
+#elif QNEWSFLASH_VERSION_MAJOR > 0 || (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR >= 3)
+    // qNewsFlash 0.3.0以降
 
     // 指定のスレッドがレス数の上限に達して書き込めない場合、スレッドを新規作成する
     HtmlFetcher fetcher(this);
-    if (fetcher.checkUrlExistence(QUrl(m_ThreadURL))) {
-        // 設定ファイルにあるスレッドのURLが存在する場合
+    //auto iExpired = fetcher.checkUrlExistence(QUrl(m_ThreadURL), m_ExpiredElement, m_ExpiredXpath, m_ThreadInfo.shiftjis);
+    auto iExpired = fetcher.checkUrlExistence(QUrl(m_ThreadURL), m_ThreadTitle, m_ExpiredXpath, m_ThreadInfo.shiftjis);
+    if (iExpired == 0) {
+        // 設定ファイルにあるスレッドのURLが生存している場合
 
         // ニュース記事を書き込むスレッドのレス数を取得
         auto ret = checkLastThreadNum();
         if (ret == -1) {
             // 最後尾のレス番号の取得に失敗した場合
             std::cerr << QString("エラー : レス数の取得に失敗").toStdString() << std::endl;
-                         return;
+            return;
         }
         else if (ret == 1) {
             // 既存のスレッドが最大レス数に達している場合、スレッドの新規作成
@@ -1650,12 +1696,12 @@ void Runner::JiJiFlashfetch()
             m_ThreadInfo.key = poster.GetNewThreadNum();
 
             // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
-            if (UpdateThreadJson()) {
+            if (UpdateThreadJson(m_ThreadInfo.subject)) {
                 // スレッド情報の保存に失敗
                 return;
             }
         }
-        else {
+        else if (iExpired == 0) {
             // 既存のスレッドが存在する場合
 
             // スレッドのタイトルを変更するかどうか (防弾嫌儲およびニュース速報(Libre)等の掲示板で使用可能)
@@ -1666,10 +1712,26 @@ void Runner::JiJiFlashfetch()
                 // 既存のスレッドへの書き込みに失敗した場合
                 return;
             }
+
+            // スレッドのタイトルが正常に変更されているかどうかを確認
+            if (m_changeTitle && !CompareThreadTitle(QUrl(m_ThreadURL), title)) {
+                // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+                if (UpdateThreadJson(title)) {
+                    // スレッド情報の保存に失敗
+                    return;
+                }
+            }
+            else {
+                // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+                if (UpdateThreadJson(m_ThreadTitle)) {
+                    // スレッド情報の保存に失敗
+                    return;
+                }
+            }
         }
     }
-    else {
-        // 設定ファイルにあるスレッドのURLが存在しない場合 (スレッドを新規作成する)
+    else if (iExpired == 1) {
+        // 設定ファイルにあるスレッドのURLが存在しない、または、落ちている場合 (スレッドを新規作成する)
 
         // 設定ファイルの"subject"キーの値が空欄の場合、ニュース記事のタイトルをスレッドのタイトルにする
         // "subject"キーの値に%tトークンが存在する場合はニュース記事のタイトルに置換
@@ -1692,12 +1754,14 @@ void Runner::JiJiFlashfetch()
         m_ThreadInfo.key = poster.GetNewThreadNum();
 
         // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
-        if (UpdateThreadJson()) {
+        if (UpdateThreadJson(m_ThreadInfo.subject)) {
             // スレッド情報の保存に失敗
             return;
         }
     }
-
+    else {
+        return;
+    }
 #endif
 
     // 書き込み済みの記事を履歴として登録 (同じ記事を1日に2回以上書き込まないようにする)
@@ -1735,18 +1799,20 @@ void Runner::itemTagsforReuters(xmlNode *a_node)
                         title = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
+                        // ニュース記事のURLを取得
                         link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
 
-                        // ニュース記事のURLからHTMLタグを解析した後、本文を取得して指定文字数分のみ取得
+                        // ニュース記事のURLからHTMLタグを解析した後、記事の概要を取得して指定文字数分のみ取得
                         QUrl url(link);
                         HtmlFetcher fetcher(m_MaxParagraph, this);
 
-                        if (fetcher.fetch(url, true, QString("//head/meta[@name='description']/@content"))) {
+                        if (fetcher.fetch(url, true, m_ReutersParaXPath)) {
                             // 本文の取得に失敗した場合
                             bSkipNews = true;
                             break;
                         }
 
+                        // ニュース記事の概要を取得
                         paragraph = fetcher.getParagraph();
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "date") == 0) {
@@ -2031,40 +2097,24 @@ int Runner::getConfiguration(QString &filepath)
         auto JsonDocument = QJsonDocument::fromJson(byaryJson);
         auto JsonObject   = JsonDocument.object();
 
-        // メンバ変数m_intervalの値を使用して自動的にニュース記事を取得するかどうか
-        // ワンショット機能の有効 / 無効
-        m_AutoFetch         = JsonObject["autofetch"].toBool(true);
+        // News APIのニュース記事
+        auto NewsAPIObject  = JsonObject["newsapi"].toObject();       /// News APIのニュースオブジェクトの取得
+        m_bNewsAPI          = NewsAPIObject["enable"].toBool(false);  /// News APIの有効 / 無効
+        m_API               = NewsAPIObject["api"].toString("");      /// News APIのAPIキー
+        m_NewsAPIRSS        = NewsAPIObject["rss"].toString("");      /// News APIからニュース記事を取得するためのRSS (URL)
+        auto excludes       = NewsAPIObject["exclude"].toArray();     /// 排除する特定メディア
+        for (auto exclude : excludes) {
+            m_ExcludeMedia.append(exclude.toString());
+        }
 
-        // News APIの有効 / 無効
-        m_bNewsAPI          = JsonObject["newsapi"].toBool(false);
+        // 時事ドットコムのニュース記事
+        auto JiJiObject     = JsonObject["jiji"].toObject();          /// 時事ドットコムのニュースオブジェクトの取得
+        m_bJiJi             = JiJiObject["enable"].toBool(true);      /// 時事ドットコムの有効 / 無効
+        m_JiJiRSS           = JiJiObject["rss"].toString("");         /// 時事ドットコムからニュース記事を取得するためのRSS (URL)
 
-        // News APIのAPIキー
-        m_API           = JsonObject["api"].toString("");
-
-        // 時事ドットコムの有効 / 無効
-        m_bJiJi             = JsonObject["jiji"].toBool(true);
-
-        // 共同通信の有効 / 無効
-        m_bKyodo            = JsonObject["kyodo"].toBool(true);
-
-        // CNET Japanの有効 / 無効
-        m_bCNet             = JsonObject["cnet"].toBool(false);
-
-        // 朝日新聞デジタルの有効 / 無効
-        m_bAsahi            = JsonObject["asahi"].toBool(false);
-
-        // ハンギョレジャパンの有効 / 無効
-        m_bHanJ             = JsonObject["hanj"].toBool(false);
-
-        // ロイター通信の有効 / 無効
-        m_bReuters          = JsonObject["reuters"].toBool(false);
-
-        // 時事ドットコムの速報ニュースオブジェクトの取得
-        auto jijiFlashObject  = JsonObject["jijiflash"].toObject();
-
-        /// 時事ドットコムの速報ニュースの有効 / 無効
-        m_bJiJiFlash          = jijiFlashObject["enable"].toBool(false);
-
+        // 時事ドットコムの速報ニュース記事
+        auto jijiFlashObject  = JsonObject["jijiflash"].toObject();       /// 時事ドットコムの速報ニュースオブジェクトの取得
+        m_bJiJiFlash          = jijiFlashObject["enable"].toBool(false);  /// 時事ドットコムの速報ニュースの有効 / 無効
         if (m_bJiJiFlash) {
             /// 時事ドットコムの速報ニュースを取得する時間間隔 (未指定の場合、インターバルは10[分])
             /// ただし、1分未満には設定できない (1分未満に設定した場合は、1分に設定する)
@@ -2117,14 +2167,50 @@ int Runner::getConfiguration(QString &filepath)
             m_JiJiFlashInfo.UrlXPath     = jijiFlashObject["urlxpath"].toString("");
         }
 
-        // tokyonp(東京新聞)オブジェクトの取得
+        // 共同通信のニュース記事
+        auto KyodoObject    = JsonObject["kyodo"].toObject();         /// 共同通信のニュースオブジェクトの取得
+        m_bKyodo            = KyodoObject["enable"].toBool(true);     /// 共同通信の有効 / 無効
+        m_KyodoRSS          = KyodoObject["rss"].toString("");        /// 共同通信からニュース記事を取得するためのRSS (URL)
+        m_NewsOnly          = KyodoObject["newsonly"].toBool(true);   /// 共同通信から取得するニュース記事の種類をニュースのみに絞るかどうか
+                                                                      /// ニュース以外の記事では、ビジネス関連やライフスタイル等の記事がある
+
+        // 朝日新聞デジタルのニュース記事
+        auto AsahiObject    = JsonObject["asahi"].toObject();         /// 朝日新聞デジタルのニュースオブジェクトの取得
+        m_bAsahi            = AsahiObject["enable"].toBool(false);    /// 朝日新聞デジタルの有効 / 無効
+        m_AsahiRSS          = AsahiObject["rss"].toString("");        /// 朝日新聞デジタルからニュース記事を取得するためのRSS (URL)
+
+        // ハンギョレジャパンのニュース記事
+        auto HanJObject     = JsonObject["hanj"].toObject();          /// ハンギョレジャパンのニュースオブジェクトの取得
+        m_bHanJ             = HanJObject["enable"].toBool(false);     /// ハンギョレジャパンの有効 / 無効
+        m_HanJRSS           = HanJObject["rss"].toString("");         /// ハンギョレジャパンからニュース記事を取得するためのRSS (URL)
+        m_HanJTopURL        = HanJObject["toppage"].toString("");     /// ハンギョレジャパンのトップページのURL
+                                                                      /// ハンギョレジャパンでは、現在、トップページを基準にニュース記事のURLが存在する
+        if (m_bHanJ && (m_HanJRSS.isEmpty() || m_HanJTopURL.isEmpty())) {
+            std::cerr << QString("エラー : ハンギョレジャパンが有効になっていますが、\"rss\"もしくは\"toppage\"の値が設定されていません").toStdString() << std::endl;
+        }
+
+        // ロイター通信のニュース記事
+        auto ReutersObject  = JsonObject["reuters"].toObject();         /// ロイター通信のニュースオブジェクトの取得
+        m_bReuters          = ReutersObject["enable"].toBool(false);    /// ロイター通信の有効 / 無効
+        m_ReutersRSS        = ReutersObject["rss"].toString("");        /// ロイター通信からニュース記事を取得するためのRSS (URL)
+        m_ReutersParaXPath  = ReutersObject["paraxpath"].toString("");  /// ロイター通信からニュース記事の概要を取得するためのXPath式
+        if (m_bReuters && (m_ReutersRSS.isEmpty() || m_ReutersParaXPath.isEmpty())) {
+            std::cerr << QString("エラー : ロイター通信が有効になっていますが、\"rss\"もしくは\"paraxpath\"の値が設定されていません").toStdString() << std::endl;
+        }
+
+        // CNET Japanのニュース記事
+        auto CNETObject     = JsonObject["cnet"].toObject();           /// CNET Japanのニュースオブジェクトの取得
+        m_bCNet             = CNETObject["enable"].toBool(false);      /// CNET Japanの有効 / 無効
+        m_CNETRSS           = CNETObject["rss"].toString("");          /// CNET Japanからニュース記事を取得するためのRSS (URL)
+        m_CNETParaXPath     = CNETObject["paraxpath"].toString("");    /// CNET Japanからニュース記事の概要を取得するためのXPath式
+        if (m_bCNet && (m_CNETRSS.isEmpty() || m_CNETParaXPath.isEmpty())) {
+            std::cerr << QString("エラー : CNET Japanが有効になっていますが、\"rss\"もしくは\"paraxpath\"の値が設定されていません").toStdString() << std::endl;
+        }
+
+        // 東京新聞のニュースオブジェクトの取得
         auto tokyoNPObject  = JsonObject["tokyonp"].toObject();
-
-        /// 東京新聞の有効 / 無効
-        m_bTokyoNP          = tokyoNPObject["enable"].toBool(false);
-
-        /// 東京新聞のトップページのURL
-        m_TokyoNPTopURL     = tokyoNPObject["toppage"].toString("");
+        m_bTokyoNP          = tokyoNPObject["enable"].toBool(false);  /// 東京新聞の有効 / 無効
+        m_TokyoNPTopURL     = tokyoNPObject["toppage"].toString("");  /// 東京新聞のトップページのURL
         if (m_TokyoNPTopURL.isEmpty()) m_TokyoNPTopURL = QString("https://www.tokyo-np.co.jp");
 
         /// 東京新聞からニュース記事を取得するページのURL
@@ -2142,6 +2228,10 @@ int Runner::getConfiguration(QString &filepath)
 
         /// 東京新聞のその他ニュース記事の情報を取得するためのJSONオブジェクト用XPath
         m_TokyoNPJSON       = tokyoNPObject["jsonpath"].toString("");
+
+        // メンバ変数m_intervalの値を使用して自動的にニュース記事を取得するかどうか
+        // ワンショット機能の有効 / 無効
+        m_AutoFetch         = JsonObject["autofetch"].toBool(true);
 
         // ニュース記事を取得する間隔
         auto interval    = JsonObject["interval"].toString("60 * 1000 * 30");
@@ -2171,12 +2261,6 @@ int Runner::getConfiguration(QString &filepath)
             }
         }
 
-        // 排除する特定メディア
-        auto excludes   = JsonObject["exclude"].toArray();
-        for (auto exclude : excludes) {
-            m_ExcludeMedia.append(exclude.toString());
-        }
-
         // 本文の一部を抜粋する場合の最大文字数
         auto maxParagraph  = JsonObject["maxpara"].toString("100");
         m_MaxParagraph = maxParagraph.toLongLong(&ok);
@@ -2187,7 +2271,7 @@ int Runner::getConfiguration(QString &filepath)
             m_MaxParagraph = 100;
         }
 
-#if defined(qNewsFlash_0_1) || defined(qNewsFlash_0_2)
+#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR >= 1) && (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR <= 2)
         // qNewsFlash 0.1.0から0.2.xまでの機能
 
         // 掲示板へPOSTデータを送信するURL
@@ -2200,8 +2284,12 @@ int Runner::getConfiguration(QString &filepath)
         m_ThreadInfo.bbs        = JsonObject["bbs"].toString("");       // BBS名
         m_ThreadInfo.key        = JsonObject["key"].toString("");       // スレッド番号
         m_ThreadInfo.shiftjis   = JsonObject["shiftjis"].toBool(true);  // Shift-JISの有効 / 無効
-#else
-        // 今後の予定 : qNewsFlash 0.3.0以降
+
+        // スレッドのタイトルを変更するかどうか
+        // この機能は、防弾嫌儲およびニュース速報(Libre)等のスレッドのタイトルが変更できる掲示板で使用可能
+        m_changeTitle    = JsonObject["chtt"].toBool(false);
+#elif QNEWSFLASH_VERSION_MAJOR > 0 || (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR >= 3)
+        // qNewsFlash 0.3.0以降
 
         // スレッド情報
         auto threadObject  = JsonObject["thread"].toObject();
@@ -2218,6 +2306,9 @@ int Runner::getConfiguration(QString &filepath)
         if (m_ThreadURL.isEmpty()) {
             std::cout << QString("スレッドのURLが空欄のため、スレッドを新規作成します").toStdString() << std::endl;
         }
+
+        /// 書き込み済みのスレッドのタイトル
+        m_ThreadTitle      = threadObject["threadtitle"].toString("");
 
         /// スレッドのレス数を取得するためのXPath
         m_ThreadXPath      = threadObject["threadxpath"].toString("/html/body//div/dl[@class='thread']//div/@id");
@@ -2252,9 +2343,27 @@ int Runner::getConfiguration(QString &filepath)
         m_ThreadInfo.bbs        = threadObject["bbs"].toString("");       // BBS名
         m_ThreadInfo.key        = threadObject["key"].toString("");       // スレッド番号
         m_ThreadInfo.shiftjis   = threadObject["shiftjis"].toBool(true);  // Shift-JISの有効 / 無効
+
+        // Webページから一意のタグの値を取得
+        // この値を確認して、スレッドが落ちているかどうかを判断する
+        // デフォルトの設定では、スレッドが落ちている状態のスレッドタイトル名
+        m_ExpiredElement     = threadObject["expiredelement"].toString("");
+
+        // スレッドが落ちた時のスレッドタイトル名を取得するXPath
+        m_ExpiredXpath       = threadObject["expiredxpath"].toString("");
+
+        // 新規スレッドのタイトル名とスレッドが落ちた時のスレッドタイトル名が同じ場合はエラー
+//        if (m_ThreadInfo.subject.compare(m_ExpiredElement, Qt::CaseSensitive) == 0) {
+//            std::cerr << QString("エラー : 新規スレッドのタイトル名とスレッドが落ちている状態のエレメント名には、別の文言を指定してください").toStdString() << std::endl;
+//            return -1;
+//        }
+
+        // スレッドのタイトルを変更するかどうか
+        // この機能は、防弾嫌儲およびニュース速報(Libre)等のスレッドのタイトルが変更できる掲示板で使用可能
+        m_changeTitle    = threadObject["chtt"].toBool(false);
 #endif
 
-#ifdef   qNewsFlash_0_0
+#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR < 1)
         // qNewsFlash 0.1.0未満の機能
         // スレッド書き込み用のJSONファイルのパス
         auto writeFile = JsonObject["writefile"].toString("/tmp/qNewsFlashWrite.json");
@@ -2309,10 +2418,6 @@ int Runner::getConfiguration(QString &filepath)
             m_LastUpdate = update;
         }
 
-        // スレッドのタイトルを変更するかどうか
-        // この機能は、防弾嫌儲およびニュース速報(Libre)等のスレッドのタイトルが変更できる掲示板で使用可能
-        m_changeTitle    = JsonObject["chtt"].toBool(false);
-
         File.close();
     }
     catch(QException &ex) {
@@ -2321,75 +2426,6 @@ int Runner::getConfiguration(QString &filepath)
     }
 
     return 0;
-}
-
-
-// 現在、"--sysconf"オプションおよび"--version"オプション以外のオプションは無効
-[[maybe_unused]] void Runner::GetOption()
-{
-    // コマンドラインのオプションを確認
-    // 設定ファイルよりもオプションの設定が優先される
-    for (auto &arg : m_args) {
-        if (arg.mid(0, 10) == "--newsapi=") {
-            // News APIの有効/無効を確認
-            arg = arg.replace("--newsapi=", "", Qt::CaseSensitive);
-            static QRegularExpression regex("['\"]", QRegularExpression::CaseInsensitiveOption);
-            m_bNewsAPI = arg.replace(regex, "").toLower() == "true";
-        }
-        else if (arg.mid(0, 7) == "--jiji=") {
-            // 時事ドットコムの有効/無効を確認
-            arg = arg.replace("--jiji=", "", Qt::CaseSensitive);
-            static QRegularExpression regex("['\"]", QRegularExpression::CaseInsensitiveOption);
-            m_bJiJi = arg.replace(regex, "").toLower() == "true";
-        }
-        else if (arg.mid(0, 6) == "--api=") {
-            // News APIのAPIキーを取得
-            arg = arg.replace("--api=", "", Qt::CaseSensitive);
-            static QRegularExpression regex("['\"]", QRegularExpression::CaseInsensitiveOption);
-            m_API = arg.replace(regex, "");
-        }
-        else if (arg.mid(0, 11) == "--interval=") {
-            // News APIから情報を取得する間隔
-            arg = arg.replace("--interval=", "", Qt::CaseSensitive);
-
-            // 先頭と末尾にクォーテーションが存在する場合は取り除く
-            if ((arg.startsWith('\"') && arg.endsWith('\"')) || (arg.startsWith('\'') && arg.endsWith('\''))) {
-                arg = arg.mid(1, arg.length() - 2);
-            }
-
-            bool ok;
-            m_interval = arg.toULongLong(&ok);
-            if (!ok) {
-                std::cerr << QString("エラー : --intervalオプションの値が不正です (%1)").arg(arg).toStdString() << std::endl;
-
-                QCoreApplication::exit();
-                return;
-            }
-
-            // 秒に換算
-            m_interval *= 1000;
-        }
-#ifdef qNewsFlash_0_0
-        // qNewsFlash 0.1.0未満の機能
-        else if (arg.mid(0, 8) == "--write=") {
-            // News APIのAPIキーを取得
-            arg = arg.replace("--write=", "", Qt::CaseSensitive);
-            static QRegularExpression regex("['\"]", QRegularExpression::CaseInsensitiveOption);
-
-            m_WriteFile = arg.replace(regex, "");
-        }
-#endif
-        else if (m_args.length() == 2 && arg.compare("--version", Qt::CaseSensitive) == 0) {
-            // バージョン情報
-            auto version = QString("qNewsFlash %1.%2.%3\n").arg(PROJECT_VERSION_MAJOR).arg(PROJECT_VERSION_MINOR).arg(PROJECT_VERSION_PATCH)
-                            + QString("LICENSE : UNLICENSE - For more information, please refer to <http://unlicense.org/>.\n")
-                            + QString("Developer : presire\n");
-            std::cerr << version.toStdString() << std::endl;
-
-            QCoreApplication::exit();
-            return;
-        }
-    }
 }
 
 
@@ -2469,7 +2505,7 @@ Article Runner::selectArticle()
 }
 
 
-#ifdef qNewsFlash_0_0
+#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR < 1)
 // qNewsFlash 0.1.0未満の機能
 int Runner::writeJSON(Article &article)
 {
@@ -2638,7 +2674,7 @@ int Runner::setLogFile(QString &filepath)
 }
 
 
-#ifdef qNewsFlash_0_0
+#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR < 1)
 int Runner::setLogFile()
 {
     QString logDir  = "";
@@ -2850,7 +2886,7 @@ int Runner::getDatafromWrittenLog()
 int Runner::checkLastThreadNum()
 {
     HtmlFetcher fetcher(this);
-    if (fetcher.fetchLastThreadNum(QUrl(m_ThreadURL), true, m_ThreadXPath, XML_TEXT_NODE)) {
+    if (fetcher.fetchLastThreadNum(QUrl(m_ThreadURL), false, m_ThreadXPath, XML_TEXT_NODE)) {
         /// 最後尾のレス番号の取得に失敗した場合
         return -1;
     }
@@ -2872,8 +2908,37 @@ int Runner::checkLastThreadNum()
 }
 
 
-// スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
-int Runner::UpdateThreadJson()
+// !chttコマンドでスレッドのタイトルが正常に変更されているかどうかを判断する
+// !chttコマンドは、防弾嫌儲系のみ使用可能
+// 0  : スレッドのタイトルが正常に変更された場合
+// 1  : !chttコマンドが失敗している場合
+// -1 : スレッドのタイトルの取得に失敗した場合
+int Runner::CompareThreadTitle(const QUrl &url, const QString &title)
+{
+    // 過去のスレッドタイトルと変更後のスレッドタイトルが同一の場合
+    if (title.compare(m_ThreadTitle, Qt::CaseSensitive) == 0) return 0;
+
+    // スレッドから<title>タグをXPathを使用して抽出する
+    HtmlFetcher fetcher(this);
+    if (fetcher.extractThreadTitle(url, true, m_ExpiredXpath, m_ThreadInfo.shiftjis)) {
+        // <title>タグの取得に失敗した場合
+        std::cerr << QString("エラー : <title>タグの取得に失敗 - CompareThreadTitle()").toStdString() << std::endl;
+        return -1;
+    }
+
+    auto ThreadTitle = fetcher.GetElement();
+    if (ThreadTitle.compare(title, Qt::CaseSensitive) != 0) {
+        // スレッドのタイトルが変更されていない場合
+        // !chttコマンドが失敗している場合
+        return 1;
+    }
+
+    return 0;
+}
+
+
+// スレッド情報 (スレッドのタイトル、スレッドのURL、スレッド番号) を設定ファイルに保存
+int Runner::UpdateThreadJson(const QString &title)
 {
     // 設定ファイルの読み込み
     QFile File(m_SysConfFile);
@@ -2905,10 +2970,11 @@ int Runner::UpdateThreadJson()
     QJsonObject obj = doc.object();
 
     // 設定ファイルの"thread"オブジェクトにある"key"および"threadurl"を更新
-    QJsonObject threadObj   = obj.value("thread").toObject();
-    threadObj["key"]        = m_ThreadInfo.key;
-    threadObj["threadurl"]  = m_ThreadURL;
-    obj["thread"]           = threadObj;
+    QJsonObject threadObj       = obj.value("thread").toObject();
+    threadObj["key"]            = m_ThreadInfo.key;
+    threadObj["threadurl"]      = m_ThreadURL;
+    threadObj["threadtitle"]    = title;
+    obj["thread"]               = threadObj;
 
     doc.setObject(obj);
 
