@@ -489,10 +489,16 @@ void Runner::fetch()
                 }
 
                 // スレッドのタイトルが正常に変更されているかどうかを確認
-                if (m_changeTitle && !CompareThreadTitle(QUrl(m_ThreadURL), title)) {
+                QString newTitle = "";
+                if (!m_ThreadInfo.subject.isEmpty()) {
+                    /// "subject"キーの値に%tトークンが存在する場合はニュース記事のタイトルに置換
+                    newTitle = replaceSubjectToken(m_ThreadInfo.subject, title);
+                }
+
+                if (m_changeTitle && !CompareThreadTitle(QUrl(m_ThreadURL), newTitle)) {
                     // スレッドのタイトルが正常に変更された場合
                     // スレッド情報 (スレッドのタイトル、スレッドのURL、スレッド番号) を設定ファイルに保存
-                    if (UpdateThreadJson(title)) {
+                    if (UpdateThreadJson(newTitle)) {
                         // スレッド情報の保存に失敗
                         return;
                     }
@@ -1714,17 +1720,23 @@ void Runner::JiJiFlashfetch()
             }
 
             // スレッドのタイトルが正常に変更されているかどうかを確認
-            if (m_changeTitle && !CompareThreadTitle(QUrl(m_ThreadURL), title)) {
-                // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
-                if (UpdateThreadJson(title)) {
-                    // スレッド情報の保存に失敗
+            QString newTitle = "";
+            if (!m_ThreadInfo.subject.isEmpty()) {
+                /// "subject"キーの値に%tトークンが存在する場合はニュース記事のタイトルに置換
+                newTitle = replaceSubjectToken(m_ThreadInfo.subject, title);
+            }
+
+            if (m_changeTitle && !CompareThreadTitle(QUrl(m_ThreadURL), newTitle)) {
+                /// スレッド情報 (スレッドのタイトル、スレッドのURL、スレッド番号) を設定ファイルに保存
+                if (UpdateThreadJson(newTitle)) {
+                    /// スレッド情報の保存に失敗
                     return;
                 }
             }
             else {
-                // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+                /// スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
                 if (UpdateThreadJson(m_ThreadTitle)) {
-                    // スレッド情報の保存に失敗
+                    /// スレッド情報の保存に失敗
                     return;
                 }
             }
@@ -2927,7 +2939,14 @@ int Runner::CompareThreadTitle(const QUrl &url, const QString &title)
     }
 
     auto ThreadTitle = fetcher.GetElement();
-    if (ThreadTitle.compare(title, Qt::CaseSensitive) != 0) {
+
+    // 正規表現を定義（スペースを含む [ と ] の間に任意の文字列があるパターン）
+    static const QRegularExpression RegEx(" \\[.*\\]$");
+
+    // 文字列からパターンに一致する部分を削除
+    ThreadTitle = ThreadTitle.remove(RegEx);
+
+    if (ThreadTitle.compare(title, Qt::CaseSensitive) == 0) {
         // スレッドのタイトルが変更されていない場合
         // !chttコマンドが失敗している場合
         return 1;

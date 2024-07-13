@@ -135,6 +135,7 @@ private:  // Variables
     int                                     m_maxThreadNum;     // スレッドの最大レス数
     QString                                 m_ExpiredElement,   // スレッドが落ちた時のスレッドタイトル名 (現在は未使用)
                                             m_ExpiredXpath;     // スレッドが落ちた時のスレッドタイトル名を取得するXPath
+                                                                // 掲示板上の新規作成したスレッドのタイトルを取得する場合にも使用
 
     // その他設定ファイルに関する情報
     long long                               m_MaxParagraph;     // 本文の一部を抜粋する場合の最大文字数

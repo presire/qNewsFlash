@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(qNewsFlash VERSION 0.3.0 LANGUAGES CXX)
+project(qNewsFlash VERSION 0.3.1 LANGUAGES CXX)
 
 
 # Linuxのみビルドを許可
