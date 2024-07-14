@@ -76,22 +76,23 @@ int JiJiFlash::FetchFlash()
     /// 日付をISO8601形式から"yyyy年M月d日 H時m分"に変換
     date = convertDate(date);
 
+    // (現在、version 0.3.2では未使用としている)
     // 速報記事のURLにアクセスして"<この速報の記事を読む>"の部分のリンクを取得
     // このリンクが存在しない場合は速報記事とする
     // このリンクが存在する場合は、既に本記事があるため速報記事と看做さない
-    if (fetcher.fetchElementJiJiFlashUrl(link, true, m_FlashInfo.UrlXPath, XML_ELEMENT_NODE)) {
-        // 既に本記事が存在する場合、または、読み込みエラーの場合
-        return -1;
-    }
+//    if (fetcher.fetchElementJiJiFlashUrl(link, true, m_FlashInfo.UrlXPath, XML_ELEMENT_NODE)) {
+//        // 既に本記事が存在する場合、または、読み込みエラーの場合
+//        return -1;
+//    }
 
-    /// 速報記事の"<この速報の記事を読む>"の部分のリンクを取得
-    auto origLink = fetcher.GetElement();
+//    /// 速報記事の"<この速報の記事を読む>"の部分のリンクを取得
+//    auto origLink = fetcher.GetElement();
 
-    /// リンクが存在するかどうかを確認
-    if (!origLink.isEmpty()) {
-        /// リンクが存在する場合
-        return -1;
-    }
+//    /// リンクが存在するかどうかを確認
+//    if (!origLink.isEmpty()) {
+//        /// リンクが存在する場合
+//        return -1;
+//    }
 
     m_Title     = title;
     m_Paragraph = paragraph;

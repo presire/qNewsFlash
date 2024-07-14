@@ -492,10 +492,12 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
     <br>
   * urlxpath  
     デフォルト値 : <code>"/html/body/div[@id='Contents']/div[@id='ContentsInner']/div[@id='Main']/div[contains(@class, 'MainInner Individual')]/article/div[contains(@class, 'ArticleText clearfix')]/p[@class='ArticleTextTab']"</code>  
-    上記の<code>flashxpath</code>で取得した速報ニュースのURLから、"<この速報の記事を読む>"の部分のリンクを取得するXPath式を指定します。  
+    <u>**この機能は、version 0.3.2以降、無効にしています。**</u>  
     <br>
-    このリンクが存在する場合は本記事が存在すると看做します。  
-    つまり、本記事が存在する場合は速報記事ではないものとします。  
+    <del>上記の<code>flashxpath</code>で取得した速報ニュースのURLから、"<この速報の記事を読む>"の部分のリンクを取得するXPath式を指定します。</del>  
+    <br>
+    <del>このリンクが存在する場合は本記事が存在すると看做します。</del>  
+    <del>つまり、本記事が存在する場合は速報記事ではないものとします。</del>  
     <br>
 * kyodo  
   * enable  
