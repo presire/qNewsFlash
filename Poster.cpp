@@ -318,7 +318,14 @@ QString Poster::GetNewThreadNum() const
 }
 
 
-// URLエンコードする
+// 全ての文字をURLエンコードする (現在は未使用)
+//QString Poster::urlEncode(const QString &originalString)
+//{
+//    return QUrl::toPercentEncoding(originalString);
+//}
+
+
+// 特定の文字をURLエンコードする
 QString Poster::urlEncode(const QString &originalString)
 {
     // URLエンコードする文字

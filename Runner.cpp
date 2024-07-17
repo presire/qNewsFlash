@@ -436,8 +436,10 @@ void Runner::fetch()
 
         // 指定のスレッドがレス数の上限に達して書き込めない場合、スレッドを新規作成する
         HtmlFetcher fetcher(this);
+
         //auto iExpired = fetcher.checkUrlExistence(QUrl(m_ThreadURL), m_ExpiredElement, m_ExpiredXpath, m_ThreadInfo.shiftjis);
         auto iExpired = fetcher.checkUrlExistence(QUrl(m_ThreadURL), m_ThreadTitle, m_ExpiredXpath, m_ThreadInfo.shiftjis);
+
         if (iExpired == 0) {
             // 設定ファイルにあるスレッドのURLが生存している場合
 
@@ -2946,7 +2948,7 @@ int Runner::CompareThreadTitle(const QUrl &url, const QString &title)
     // 文字列からパターンに一致する部分を削除
     ThreadTitle = ThreadTitle.remove(RegEx);
 
-    if (ThreadTitle.compare(title, Qt::CaseSensitive) == 0) {
+    if (ThreadTitle.compare(title, Qt::CaseSensitive) != 0) {
         // スレッドのタイトルが変更されていない場合
         // !chttコマンドが失敗している場合
         return 1;

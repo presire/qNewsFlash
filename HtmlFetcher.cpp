@@ -64,6 +64,11 @@ bool HtmlFetcher::checkUrlExistence(const QUrl &url)
 /// スレッド情報の取得に失敗した場合 : -1
 int HtmlFetcher::checkUrlExistence(const QUrl &url, const QString ExpiredElement, const QString ExpiredXPath, bool shiftjis)
 {
+    // スレッドのURLが無い場合
+    if (url.isEmpty()) {
+        return 1;
+    }
+
     // まず、Webページが存在するかどうかを確認する
     QNetworkAccessManager manager;
 
