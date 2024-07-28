@@ -288,6 +288,18 @@ int Poster::replyPostFinished(QNetworkReply *reply, const QUrl &url, const THREA
 
         // 新規作成したスレッド番号を取得
         m_NewThreadNum = fetcher.GetThreadNum();
+
+        // 新規作成したスレッドにアクセスしてタイトルを抽出
+        if (fetcher.extractThreadTitle(QUrl(m_NewThreadURL), true, ThreadInfo.expiredXPath, ThreadInfo.shiftjis) == 0) {
+            // 新規作成したスレッドのタイトル抽出に成功した場合
+            m_NewThreadTitle = fetcher.GetElement();
+        }
+        else {
+            std::cerr << QString("スレッドタイトルの抽出に失敗しました").toStdString() << std::endl;
+            reply->deleteLater();
+
+            return -1;
+        }
     }
 
     reply->deleteLater();
@@ -307,6 +319,13 @@ QString Poster::GetNewThreadURL() const
 QString Poster::GetNewThreadNum() const
 {
     return m_NewThreadNum;
+}
+
+
+// 新規作成したスレッドのスレッド番号を取得する
+QString Poster::GetNewThreadTitle() const
+{
+    return m_NewThreadTitle;
 }
 
 

@@ -157,10 +157,12 @@ int HtmlFetcher::checkUrlExistence(const QUrl &url, const QString ExpiredElement
                 checkElement = reinterpret_cast<const char*>(elementNode->children->content);
 
                 /// 正規表現を定義（スペースを含む [ と ] の間に任意の文字列があるパターン）
-                static const QRegularExpression RegEx(" \\[.*\\]$");
+                /// (現在は使用しない)
+                //static const QRegularExpression RegEx(" \\[.*\\]$");
 
                 /// 文字列からパターンに一致する部分を削除
-                checkElement = checkElement.remove(RegEx);
+                /// (現在は使用しない)
+                //checkElement = checkElement.remove(RegEx);
 
                 /// 設定ファイルの"expiredelement"キーの値と取得したタグの値を比較
                 /// デフォルトの設定では、スレッドタイトル名 (落ちている状態のスレッドタイトル名) を比較

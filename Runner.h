@@ -179,7 +179,7 @@ private:  // Methods
     Article        selectArticle();                             // 取得したニュース記事群からランダムで1つを選択
     int            checkLastThreadNum();                        // 書き込むスレッドのレス数が上限に達しているかどうかを確認
     int            CompareThreadTitle(const QUrl &url,          // !chttコマンドでスレッドのタイトルが正常に変更されているかどうかを確認
-                                      const QString &title);    // !chttコマンドは、防弾嫌儲系の掲示板のみ使用可能
+                                      QString &title);          // !chttコマンドは、防弾嫌儲系の掲示板のみ使用可能
     int            UpdateThreadJson(const QString &title);      // スレッド情報 (スレッドのタイトル、スレッドのURL、スレッド番号) を設定ファイルに保存
     int            writeLog(Article &article);                  // 書き込み済みのニュース記事をJSONファイルに保存
     int            updateDateJson(const QString &currentDate);  // 最後にニュース記事を取得した日付を設定ファイルに保存 (フォーマット : "yyyy/M/d")

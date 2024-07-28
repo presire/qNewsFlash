@@ -412,6 +412,10 @@ void Runner::fetch()
         auto epocTime = GetEpocTime();
         m_ThreadInfo.time = QString::number(epocTime);
 
+        // スレッドのタイトルを抽出するためのXPath
+        // これは、新規スレッド作成向け、および、!chttコマンド向けの設定
+        m_ThreadInfo.expiredXPath = m_ExpiredXpath;
+
         Poster poster(this);
 
         // 掲示板のクッキーを取得
@@ -436,8 +440,6 @@ void Runner::fetch()
 
         // 指定のスレッドがレス数の上限に達して書き込めない場合、スレッドを新規作成する
         HtmlFetcher fetcher(this);
-
-        //auto iExpired = fetcher.checkUrlExistence(QUrl(m_ThreadURL), m_ExpiredElement, m_ExpiredXpath, m_ThreadInfo.shiftjis);
         auto iExpired = fetcher.checkUrlExistence(QUrl(m_ThreadURL), m_ThreadTitle, m_ExpiredXpath, m_ThreadInfo.shiftjis);
 
         if (iExpired == 0) {
@@ -468,12 +470,13 @@ void Runner::fetch()
                     return;
                 }
 
-                // 新規作成したスレッドのURLとスレッド番号を取得
+                // 新規作成したスレッドのタイトル、URL、スレッド番号を取得
                 m_ThreadURL      = poster.GetNewThreadURL();
                 m_ThreadInfo.key = poster.GetNewThreadNum();
+                m_ThreadTitle    = poster.GetNewThreadTitle();
 
-                // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
-                if (UpdateThreadJson(m_ThreadInfo.subject)) {
+                // スレッド情報 (スレッドのタイトル、URL、スレッド番号) を設定ファイルに保存
+                if (UpdateThreadJson(m_ThreadTitle)) {
                     // スレッド情報の保存に失敗
                     return;
                 }
@@ -491,22 +494,27 @@ void Runner::fetch()
                 }
 
                 // スレッドのタイトルが正常に変更されているかどうかを確認
-                QString newTitle = "";
-                if (!m_ThreadInfo.subject.isEmpty()) {
-                    /// "subject"キーの値に%tトークンが存在する場合はニュース記事のタイトルに置換
-                    newTitle = replaceSubjectToken(m_ThreadInfo.subject, title);
-                }
-
-                if (m_changeTitle && !CompareThreadTitle(QUrl(m_ThreadURL), newTitle)) {
-                    // スレッドのタイトルが正常に変更された場合
-                    // スレッド情報 (スレッドのタイトル、スレッドのURL、スレッド番号) を設定ファイルに保存
-                    if (UpdateThreadJson(newTitle)) {
-                        // スレッド情報の保存に失敗
-                        return;
+                if (m_changeTitle) {
+                    // !chttコマンドが有効の場合
+                    if (CompareThreadTitle(QUrl(m_ThreadURL), m_ThreadTitle) == 0) {
+                        // スレッドのタイトルが正常に変更された場合
+                        // スレッド情報 (スレッドのタイトル、スレッドのURL、スレッド番号) を設定ファイルに保存
+                        if (UpdateThreadJson(m_ThreadTitle)) {
+                            // スレッド情報の保存に失敗
+                            return;
+                        }
+                    }
+                    else {
+                        // スレッドのタイトルが変更されなかった場合
+                        // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+                        if (UpdateThreadJson(m_ThreadTitle)) {
+                            // スレッド情報の保存に失敗
+                            return;
+                        }
                     }
                 }
                 else {
-                    // スレッドのタイトルが変更されなかった場合
+                    // !chttコマンドが無効の場合
                     // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
                     if (UpdateThreadJson(m_ThreadTitle)) {
                         // スレッド情報の保存に失敗
@@ -516,7 +524,9 @@ void Runner::fetch()
             }
         }
         else if (iExpired == 1) {
-            // 設定ファイルにあるスレッドのURLが存在しない、または、落ちている場合 (スレッドを新規作成する)
+            // 設定ファイルにあるスレッドのURLが存在しない場合
+            // または、スレッドタイトルが異なる場合
+            // (スレッドを新規作成する)
 
             // 設定ファイルの"subject"キーの値が空欄の場合、ニュース記事のタイトルをスレッドのタイトルにする
             // "subject"キーの値に%tトークンが存在する場合はニュース記事のタイトルに置換
@@ -534,12 +544,13 @@ void Runner::fetch()
                 return;
             }
 
-            // 新規作成したスレッドのURLとスレッド番号を取得
+            // 新規作成したスレッドのタイトル、URL、スレッド番号を取得
             m_ThreadURL      = poster.GetNewThreadURL();
             m_ThreadInfo.key = poster.GetNewThreadNum();
+            m_ThreadTitle    = poster.GetNewThreadTitle();
 
-            // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
-            if (UpdateThreadJson(m_ThreadInfo.subject)) {
+            // スレッド情報 (スレッドのタイトル、URL、スレッド番号) を設定ファイルに保存
+            if (UpdateThreadJson(m_ThreadTitle)) {
                 // スレッド情報の保存に失敗
                 return;
             }
@@ -1669,8 +1680,8 @@ void Runner::JiJiFlashfetch()
 
     // 指定のスレッドがレス数の上限に達して書き込めない場合、スレッドを新規作成する
     HtmlFetcher fetcher(this);
-    //auto iExpired = fetcher.checkUrlExistence(QUrl(m_ThreadURL), m_ExpiredElement, m_ExpiredXpath, m_ThreadInfo.shiftjis);
     auto iExpired = fetcher.checkUrlExistence(QUrl(m_ThreadURL), m_ThreadTitle, m_ExpiredXpath, m_ThreadInfo.shiftjis);
+
     if (iExpired == 0) {
         // 設定ファイルにあるスレッドのURLが生存している場合
 
@@ -1702,14 +1713,15 @@ void Runner::JiJiFlashfetch()
             // 新規作成したスレッドのURLとスレッド番号を取得
             m_ThreadURL      = poster.GetNewThreadURL();
             m_ThreadInfo.key = poster.GetNewThreadNum();
+            m_ThreadTitle    = poster.GetNewThreadTitle();
 
-            // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
-            if (UpdateThreadJson(m_ThreadInfo.subject)) {
+            // スレッド情報 (スレッドのタイトル、URL、スレッド番号) を設定ファイルに保存
+            if (UpdateThreadJson(m_ThreadTitle)) {
                 // スレッド情報の保存に失敗
                 return;
             }
         }
-        else if (iExpired == 0) {
+        else {
             // 既存のスレッドが存在する場合
 
             // スレッドのタイトルを変更するかどうか (防弾嫌儲およびニュース速報(Libre)等の掲示板で使用可能)
@@ -1722,23 +1734,30 @@ void Runner::JiJiFlashfetch()
             }
 
             // スレッドのタイトルが正常に変更されているかどうかを確認
-            QString newTitle = "";
-            if (!m_ThreadInfo.subject.isEmpty()) {
-                /// "subject"キーの値に%tトークンが存在する場合はニュース記事のタイトルに置換
-                newTitle = replaceSubjectToken(m_ThreadInfo.subject, title);
-            }
-
-            if (m_changeTitle && !CompareThreadTitle(QUrl(m_ThreadURL), newTitle)) {
-                /// スレッド情報 (スレッドのタイトル、スレッドのURL、スレッド番号) を設定ファイルに保存
-                if (UpdateThreadJson(newTitle)) {
-                    /// スレッド情報の保存に失敗
-                    return;
+            if (m_changeTitle) {
+                // !chttコマンドが有効の場合
+                if (CompareThreadTitle(QUrl(m_ThreadURL), m_ThreadTitle) == 0) {
+                    // スレッドのタイトルが正常に変更された場合
+                    // スレッド情報 (スレッドのタイトル、スレッドのURL、スレッド番号) を設定ファイルに保存
+                    if (UpdateThreadJson(m_ThreadTitle)) {
+                        // スレッド情報の保存に失敗
+                        return;
+                    }
+                }
+                else {
+                    // スレッドのタイトルが変更されなかった場合
+                    // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+                    if (UpdateThreadJson(m_ThreadTitle)) {
+                        // スレッド情報の保存に失敗
+                        return;
+                    }
                 }
             }
             else {
-                /// スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
+                // !chttコマンドが無効の場合
+                // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
                 if (UpdateThreadJson(m_ThreadTitle)) {
-                    /// スレッド情報の保存に失敗
+                    // スレッド情報の保存に失敗
                     return;
                 }
             }
@@ -1763,12 +1782,13 @@ void Runner::JiJiFlashfetch()
             return;
         }
 
-        // 新規作成したスレッドのURLとスレッド番号を取得
+        // 新規作成したスレッドのタイトル、URL、スレッド番号を取得
         m_ThreadURL      = poster.GetNewThreadURL();
         m_ThreadInfo.key = poster.GetNewThreadNum();
+        m_ThreadTitle    = poster.GetNewThreadTitle();
 
-        // スレッド情報 (スレッドのURLおよびスレッド番号) を設定ファイルに保存
-        if (UpdateThreadJson(m_ThreadInfo.subject)) {
+        // スレッド情報 (スレッドのタイトル、URL、スレッド番号) を設定ファイルに保存
+        if (UpdateThreadJson(m_ThreadTitle)) {
             // スレッド情報の保存に失敗
             return;
         }
@@ -2927,11 +2947,8 @@ int Runner::checkLastThreadNum()
 // 0  : スレッドのタイトルが正常に変更された場合
 // 1  : !chttコマンドが失敗している場合
 // -1 : スレッドのタイトルの取得に失敗した場合
-int Runner::CompareThreadTitle(const QUrl &url, const QString &title)
+int Runner::CompareThreadTitle(const QUrl &url, QString &title)
 {
-    // 過去のスレッドタイトルと変更後のスレッドタイトルが同一の場合
-    if (title.compare(m_ThreadTitle, Qt::CaseSensitive) == 0) return 0;
-
     // スレッドから<title>タグをXPathを使用して抽出する
     HtmlFetcher fetcher(this);
     if (fetcher.extractThreadTitle(url, true, m_ExpiredXpath, m_ThreadInfo.shiftjis)) {
@@ -2943,15 +2960,20 @@ int Runner::CompareThreadTitle(const QUrl &url, const QString &title)
     auto ThreadTitle = fetcher.GetElement();
 
     // 正規表現を定義（スペースを含む [ と ] の間に任意の文字列があるパターン）
-    static const QRegularExpression RegEx(" \\[.*\\]$");
+    // (現在は使用しない)
+    //static const QRegularExpression RegEx(" \\[.*\\]$");
 
     // 文字列からパターンに一致する部分を削除
-    ThreadTitle = ThreadTitle.remove(RegEx);
+    // (現在は使用しない)
+    //ThreadTitle = ThreadTitle.remove(RegEx);
 
-    if (ThreadTitle.compare(title, Qt::CaseSensitive) != 0) {
-        // スレッドのタイトルが変更されていない場合
-        // !chttコマンドが失敗している場合
+    if (ThreadTitle.compare(title, Qt::CaseSensitive) == 0) {
+        // スレッドのタイトルが変更されていない場合 (!chttコマンドが失敗している場合)
         return 1;
+    }
+    else {
+        // スレッドのタイトルが変更された場合 (!chttコマンドが成功した場合)
+        title = ThreadTitle;
     }
 
     return 0;

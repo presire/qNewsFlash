@@ -31,6 +31,7 @@ struct THREAD_INFO
     QString time        = "";   // エポックタイム (UNIXタイムまたはPOSIXタイムとも呼ばれる)
     QString key         = "";   // スレッド番号 (スレッドに書き込む場合のみ入力)
     bool    shiftjis    = true;
+    QString expiredXPath = "";  // スレッドのタイトルを抽出するXPath
 };
 
 
@@ -39,11 +40,12 @@ class Poster : public QObject
     Q_OBJECT
 
 private:
-    std::unique_ptr<QNetworkAccessManager> m_pManager;      // 掲示板にアクセスするためのネットワークオブジェクト
-    QList<QNetworkCookie>                  m_Cookies;       // クッキーを保存
-    QUrl                                   m_URL;           // 書き込み用URL
-    QString                                m_NewThreadURL,  // 新規作成したスレッドのURL
-                                           m_NewThreadNum;  // 新規作成したスレッド番号
+    std::unique_ptr<QNetworkAccessManager> m_pManager;          // 掲示板にアクセスするためのネットワークオブジェクト
+    QList<QNetworkCookie>                  m_Cookies;           // クッキーを保存
+    QUrl                                   m_URL;               // 書き込み用URL
+    QString                                m_NewThreadURL,      // 新規作成したスレッドのURL
+                                           m_NewThreadNum,      // 新規作成したスレッド番号
+                                           m_NewThreadTitle;    // 新規作成したスレッドタイトル
 
 private:
     // GETデータ(Webページ)を確認する
@@ -62,6 +64,7 @@ public:
     int         PostforCreateThread(const QUrl &url, THREAD_INFO &ThreadInfo);  // 新規スレッドを作成する
     [[nodiscard]] QString     GetNewThreadURL() const;                          // 新規作成したスレッドのURLを取得する
     [[nodiscard]] QString     GetNewThreadNum() const;                          // 新規作成したスレッド番号を取得する
+    [[nodiscard]] QString     GetNewThreadTitle() const;                        // 新規作成したスレッドタイトルを取得する
 
 signals:
 

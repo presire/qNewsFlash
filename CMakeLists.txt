@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.15)
-project(qNewsFlash VERSION 0.3.3 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.16)
+project(qNewsFlash VERSION 0.3.4 LANGUAGES CXX)
 
 
 # Linuxのみビルドを許可
@@ -62,7 +62,12 @@ link_directories(${LIBXML2_LIBRARY_DIRS})
 
 # pkg-configを使用してQtライブラリを検索
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Network)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Network)
+#find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Network)
+if(QT_VERSION_MAJOR EQUAL 5)
+    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Network)
+elseif(QT_VERSION_MAJOR EQUAL 6)
+    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Network Core5Compat)
+endif()
 
 ## Qtのpkg-configファイル
 pkg_check_modules(QT_CORE     Qt${QT_VERSION_MAJOR}Core    REQUIRED IMPORTED_TARGET)
@@ -148,12 +153,22 @@ target_include_directories(qNewsFlash PRIVATE
 )
 
 
-target_link_libraries(qNewsFlash
-        Qt${QT_VERSION_MAJOR}::Core
-        Qt${QT_VERSION_MAJOR}::Gui
-        Qt${QT_VERSION_MAJOR}::Network
-        ${LIBXML2_LIBRARIES}
-)
+if(QT_VERSION_MAJOR EQUAL 5)
+    target_link_libraries(qNewsFlash PRIVATE
+            Qt${QT_VERSION_MAJOR}::Core
+            Qt${QT_VERSION_MAJOR}::Gui
+            Qt${QT_VERSION_MAJOR}::Network
+            ${LIBXML2_LIBRARIES}
+    )
+elseif(QT_VERSION_MAJOR EQUAL 6)
+    target_link_libraries(qNewsFlash PRIVATE
+            Qt${QT_VERSION_MAJOR}::Core
+            Qt${QT_VERSION_MAJOR}::Gui
+            Qt${QT_VERSION_MAJOR}::Network
+            Qt${QT_VERSION_MAJOR}::Core5Compat
+            ${LIBXML2_LIBRARIES}
+    )
+endif()
 
 
 # libxml2のコンパイルオプション
