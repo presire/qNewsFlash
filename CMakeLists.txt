@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(qNewsFlash VERSION 0.3.4 LANGUAGES CXX)
+project(qNewsFlash VERSION 0.3.5 LANGUAGES CXX)
 
 
 # Linuxのみビルドを許可
@@ -206,9 +206,10 @@ string(TOUPPER ${SYSTEMD} SYSTEMD_UPPER)
 
 ## SYSTEMDオプションの値が"USER"または"SYSTEM"の場合、Systemdサービスをインストール
 if(SYSTEMD_UPPER STREQUAL "USER" OR SYSTEMD_UPPER STREQUAL "SYSTEM")
-    ## qnewsflash.service.qnewsflash.serviceを生成
+    ## qnewsflash.service, qnewsflash.timerを生成
     ## Systemdサービスファイル内の文字列を置換
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/etc/qnewsflash.service.in ${CMAKE_CURRENT_BINARY_DIR}/etc/systemd/system/qnewsflash.service @ONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/etc/qnewsflash.timer.in   ${CMAKE_CURRENT_BINARY_DIR}/etc/systemd/system/qnewsflash.timer   @ONLY)
 
     ## SYSTEMD変数が"user"の場合、ホームディレクトリの取得
     if(WIN32)   # Windowsの場合
@@ -229,11 +230,12 @@ if(SYSTEMD_UPPER STREQUAL "USER" OR SYSTEMD_UPPER STREQUAL "SYSTEM")
         set(SYSTEMD_INSTALL_DIR ${SYSTEMD_SYSTEM_DIR})
     endif()
 
-    message("qnewsflash.service は ${SYSTEMD_INSTALL_DIR} ディレクトリにインストールされます")
+    message("qnewsflash.service, qnewsflash.timer は ${SYSTEMD_INSTALL_DIR} ディレクトリにインストールされます")
 
     ## qnewsflash.serviceファイルのインストールディレクトリを指定
     install(FILES
                 ${CMAKE_CURRENT_BINARY_DIR}/etc/systemd/system/qnewsflash.service
+                ${CMAKE_CURRENT_BINARY_DIR}/etc/systemd/system/qnewsflash.timer
                 DESTINATION ${SYSTEMD_INSTALL_DIR}
     )
 endif()

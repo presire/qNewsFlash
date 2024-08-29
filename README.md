@@ -201,29 +201,37 @@ Systemdサービスを再読み込みします。
     systemctl --user daemon-reload  
 <br>
 
-qNewsFlashを実行する時は、qnewsflashデーモンを開始します。  
+qnewsflashデーモンは遅延実行を行う必要があるため、**タイマサービスを有効化または実行する必要**があります。  
+qNewsFlashを実行する時は、タイマデーモンを開始します。  
 
-    sudo systemctl start qnewsflash.service
+    sudo systemctl start qnewsflash.timer  
     または
-    systemctl --user start qnewsflash.service
+    systemctl --user start qnewsflash.timer  
 <br>
 
-PCの起動時またはユーザのログイン時において、qNewsFlashデーモンを自動起動する場合は、以下に示すコマンドを実行します。  
+PCの起動時またはユーザのログイン時において、qnewsflashデーモンを自動起動する場合は、タイマデーモンを有効にします。  
 
-    sudo systemctl enable qnewsflash.service  
+    sudo systemctl enable qnewsflash.timer  
     または  
-    systemctl --user enable qnewsflash.service  
+    systemctl --user enable qnewsflash.timer  
 <br>
 
-qNewsFlashを停止する場合は、以下に示すコマンドを実行します。
+PCの起動時またはユーザのログイン時において、qnewsflashデーモンの自動起動を無効にする場合は、タイマデーモンを無効にします。  
 
-    sudo systemctl stop qnewsflash.service
+    sudo systemctl disable qnewsflash.timer  
+    または  
+    systemctl --user disable qnewsflash.timer  
+<br>
+
+qNewsFlashを停止する場合は、qnewsflashデーモンとタイマデーモンを停止します。
+
+    sudo systemctl stop qnewsflash.service qnewsflash.timer  
     または
-    systemctl --user stop qnewsflash.service
+    systemctl --user stop qnewsflash.service qnewsflash.timer  
 <br>
 
 **デフォルトでは、PCの起動直後から30[秒]待機した後、本ソフトウェアを遅延起動しています。**  
-**もし十分なリソースをもつPCの場合は、この設定を変更しても正常に動作すると予想されます。**  
+**もし十分なリソースをもつPCの場合は、この秒数を短くしても正常に動作すると予想されます。**  
 <br>
 
 ## 2.3. 直接実行する

@@ -1656,6 +1656,9 @@ void Runner::JiJiFlashfetch()
     auto epocTime = GetEpocTime();
     m_ThreadInfo.time = QString::number(epocTime);
 
+    // スレッドのタイトルを抽出するためのXPath
+    m_ThreadInfo.expiredXPath = m_ExpiredXpath;
+
     Poster poster(this);
 
     // 掲示板のクッキーを取得
