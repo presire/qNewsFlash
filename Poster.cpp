@@ -1,4 +1,11 @@
-#include <QTextCodec>
+#include <QtGlobal>
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    #include <QStringEncoder>
+#else
+    #include <QTextCodec>
+#endif
+
 #include <iostream>
 #include "Poster.h"
 #include "HtmlFetcher.h"
@@ -59,7 +66,6 @@ int Poster::PostforWriteThread(const QUrl &url, THREAD_INFO &ThreadInfo)
 
     // POSTデータの生成 (<form>タグの<input>要素に基づいてデータを設定)
     // 既存のスレッドに書き込む場合は、<input>要素のname属性の値"key"にスレッド番号を指定する必要がある
-    QTextCodec *codec;                  // Shift-JIS用エンコードオブジェクト
     QByteArray encodedPostData = {};    // エンコードされたバイト列
 
     if (!ThreadInfo.shiftjis) {
@@ -90,8 +96,14 @@ int Poster::PostforWriteThread(const QUrl &url, THREAD_INFO &ThreadInfo)
         auto postData   = postMessage.toUtf8();             // POSTデータをバイト列へ変換
 
         // POSTデータの文字コードをShift-JISへエンコード
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        QStringEncoder encoder("Shift-JIS");
+        encodedPostData = encoder(postData);
+#else
+        QTextCodec *codec;  // Shift-JIS用エンコードオブジェクト
         codec           = QTextCodec::codecForName("Shift-JIS");
         encodedPostData = codec->fromUnicode(postData);
+#endif
     }
 
     // ContentTypeHeaderをHTTPリクエストに設定
@@ -126,7 +138,6 @@ int Poster::PostforCreateThread(const QUrl &url, THREAD_INFO &ThreadInfo)
 
     // POSTデータの生成 (<form>タグの<input>要素に基づいてデータを設定)
     // 新規スレッドを作成する場合は、<input>要素のname属性の値"key"を除去する必要がある
-    QTextCodec *codec;                  // Shift-JIS用エンコードオブジェクト
     QByteArray encodedPostData = {};    // エンコードされたバイト列
 
     if (!ThreadInfo.shiftjis) {
@@ -155,8 +166,14 @@ int Poster::PostforCreateThread(const QUrl &url, THREAD_INFO &ThreadInfo)
         auto postData   = postMessage.toUtf8();             // POSTデータをバイト列へ変換
 
         // POSTデータの文字コードをShift-JISへエンコード
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        QStringEncoder encoder("Shift-JIS");
+        encodedPostData = encoder(postData);
+#else
+        QTextCodec *codec;  // Shift-JIS用エンコードオブジェクト
         codec           = QTextCodec::codecForName("Shift-JIS");
         encodedPostData = codec->fromUnicode(postData);
+#endif
     }
 
     // ContentTypeHeaderをHTTPリクエストに設定
@@ -193,13 +210,18 @@ int Poster::replyPostFinished(QNetworkReply *reply, THREAD_INFO &ThreadInfo)
         return -1;
     }
     else {
-        QTextCodec *codec;
         QString replyData;
 
         if (ThreadInfo.shiftjis) {
             // Shift-JISからUTF-8へエンコード
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            QStringEncoder encoder("Shift-JIS");
+            replyData = encoder(reply->readAll());
+#else
+            QTextCodec *codec;
             codec     = QTextCodec::codecForName("Shift-JIS");
             replyData = codec->toUnicode(reply->readAll());
+#endif
         }
         else {
             replyData = reply->readAll();
@@ -246,13 +268,18 @@ int Poster::replyPostFinished(QNetworkReply *reply, const QUrl &url, const THREA
         return -1;
     }
     else {
-        QTextCodec *codec;
         QString replyData;
 
         if (ThreadInfo.shiftjis) {
             // Shift-JISからUTF-8へエンコード
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            QStringEncoder encoder("Shift-JIS");
+            replyData = encoder(reply->readAll());
+#else
+            QTextCodec *codec;
             codec     = QTextCodec::codecForName("Shift-JIS");
             replyData = codec->toUnicode(reply->readAll());
+#endif
         }
         else {
             replyData = reply->readAll();
@@ -332,16 +359,18 @@ QString Poster::GetNewThreadTitle() const
 // 文字列をShift-JISにエンコードする
 [[maybe_unused]] QByteArray Poster::encodeStringToShiftJIS(const QString &str)
 {
+    QByteArray ShiftJISData;
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    QStringEncoder encoder("Shift-JIS");
+    ShiftJISData = encoder(str);
+#else
     QTextCodec *codec = QTextCodec::codecForName("Shift-JIS");
-    return codec->fromUnicode(str);
+    ShiftJISData = codec->fromUnicode(str);
+#endif
+
+    return ShiftJISData;
 }
-
-
-// 全ての文字をURLエンコードする (現在は未使用)
-//QString Poster::urlEncode(const QString &originalString)
-//{
-//    return QUrl::toPercentEncoding(originalString);
-//}
 
 
 // 特定の文字をURLエンコードする

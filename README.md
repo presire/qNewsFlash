@@ -50,8 +50,8 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 
 <br>
 
-**本ソフトウェアを動作させるには、Qt 5.15 (Core、Network) および libxml 2.0が必要となります。**  
-**Qt 6を使用してビルドおよび動作させることができる可能性もありますが、確認はしておりませんのでご注意ください。**  
+**本ソフトウェアを動作させるには、Qt 5.15 / Qt 6 (Core、Network) および libxml 2.0が必要となります。**  
+**Qt 6.5.3でも動作確認しています。**  
 <br>
 
 README.mdでは、Red Hat Enterprise LinuxおよびSUSE Linux Enterprise / openSUSEを前提に記載しております。  
@@ -74,13 +74,23 @@ Raspberry Pi上での動作は確認済みです。
 
 **ご要望があれば、逐次開発を進めていく予定です。**  
 <br>
+
+今後の予定  
+* 書き込みに関するモードを3つ用意する。  
+  * 1つのスレッドにのみ書き込むモード (現状と同じ)  
+  * ニュース記事ごとに新規スレッドを立てるモード  
+  * ハイブリッドモード  
+    これは、通常のニュース記事は新規スレッドを立てて、時事通信の速報ニュースのみ1つのスレッドに書き込みするモード。  
+
+* !bottomコマンド機能の実装  
+  指定時間過ぎたスレッドに書き込みが無い場合は、該当スレッドに対して、!bottomを書き込む。  
+<br>
 <br>
 
 # 1. ビルドに必要なライブラリをインストール  
 <br>
 
 * Qt5 Core  
-* Qt5 Gui  
 * Qt5 Network  
   * <https://www.qt.io/>  
   * qNewsFlashは、Qtライブラリを使用しています。
@@ -103,18 +113,37 @@ Raspberry Pi上での動作は確認済みです。
     # Red Hat Enterprise Linux
     sudo dnf update   
     sudo dnf install coreutils coreutils-common make cmake gcc gcc-c++ \  
-                     libxml2 libxml2-devel qt5-qtbase-devel  
+                     libxml2 libxml2-devel  
+                     
+                     # Qt 5 を使用する場合  
+                     qt5-qtbase-devel  
+
+                     # Qt 6 を使用する場合  
+                     qt6-qtbase-devel \  
+                     openssl3 openssl3-libs openssl3-devel  
 
     # SUSE Linux Enterprise / openSUSE
     sudo zypper update  
     sudo zypper install coreutils make cmake gcc gcc-c++ libxml2-devel \  
+                        
+                        # Qt 5 を使用する場合  
                         libqt5-qtbase-common-devel libQt5Core-devel    \  
-                        libQt5Gui-devel libQt5Network-devel  
+                        libQt5Network-devel  
+                        
+                        # Qt 6 を使用する場合  
+                        qt6-base-devel qt6-core-devel qt6-network-devel \  
+                        openssl-3 libopenssl3 libopenssl-3-devel  
 
     # Debian GNU/Linux, Raspberry Pi OS  
     sudo apt update && sudo apt upgrade  
     sudo apt install coreutils make cmake gcc libxml2 libxml2-dev \  
+
+                     # Qt 5 を使用する場合  
                      qtbase5-dev  
+
+                     # Qt 6 を使用する場合  
+                     qt6-base-dev  \
+                     openssl libssl3 libssl-dev  # Qt 6を使用する場合  
 <br>
 <br>
 

@@ -1,4 +1,11 @@
-#include <QTextCodec>
+#include <QtGlobal>
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    #include <QStringEncoder>
+#else
+    #include <QTextCodec>
+#endif
+
 #include <libxml/parser.h>
 #include <libxml/xpath.h>
 #include <iconv.h>
@@ -120,8 +127,14 @@ int HtmlFetcher::checkUrlExistence(const QUrl &url, const QString ExpiredElement
         QString encodedData = "";
         if (shiftjis) {
             /// Shift-JISからUTF-8へエンコード
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            QStringDecoder decoder("Shift-JIS");
+            encodedData = decoder(pReply->readAll());
+#else
             auto codec  = QTextCodec::codecForName("Shift-JIS");
             encodedData = codec->toUnicode(pReply->readAll());
+#endif
+
         }
         else {
             encodedData = pReply->readAll();
@@ -695,8 +708,13 @@ int HtmlFetcher::extractThreadTitle(const QUrl &url, bool redirect, const QStrin
     QString htmlContent;
     if (bShiftJIS) {
         // Shift-JISからUTF-8へエンコード
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        QStringDecoder decoder("Shift-JIS");
+        htmlContent = decoder(pReply->readAll());
+#else
         auto codec  = QTextCodec::codecForName("Shift-JIS");
         htmlContent = codec->toUnicode(pReply->readAll());
+#endif
     }
     else {
         htmlContent = pReply->readAll();

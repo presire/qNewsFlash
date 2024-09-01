@@ -9,7 +9,6 @@
 #include <QJsonArray>
 #include <QTimeZone>
 #include <QXmlStreamReader>
-#include <QTextDocumentFragment>
 #include <QException>
 #include <iostream>
 #include <random>
@@ -867,7 +866,18 @@ void Runner::itemTagsforKyodo(xmlNode *a_node)
                         paragraph.replace("&#8230;", "");
 
                         // QTextDocumentFragment::fromHtml()を使用して変換
-                        paragraph = QTextDocumentFragment::fromHtml(paragraph).toPlainText();
+                        // QTextDocumentFragmentクラスはQtGuiモジュールが必要となるため、
+                        // 代替として、Qtcoreモジュールのみで使用できるQXmlStreamReaderクラスを使用する
+                        //paragraph = QTextDocumentFragment::fromHtml(paragraph).toPlainText();
+                        QXmlStreamReader xml(paragraph);
+                        QString result = "";
+
+                        while (!xml.atEnd()) {
+                            if (xml.readNext() == QXmlStreamReader::Characters) {
+                                result += xml.text();
+                            }
+                        }
+                        paragraph = result.trimmed();
 
                         // 本文が指定文字数以上の場合、指定文字数分のみを抽出
                         paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
@@ -1623,10 +1633,11 @@ void Runner::JiJiFlashfetch()
 
     // 速報記事の公開日を確認
     // 今日の速報記事ではない場合は無視
-    auto isCheckDate = isToday(pubDate);
-    if (!isCheckDate) {
-        return;
-    }
+    // (現在は使用しない)
+    // auto isCheckDate = isToday(pubDate);
+    // if (!isCheckDate) {
+    //     return;
+    // }
 
     // 既に書き込み済みの速報記事の場合は無視
     for (auto &writtenArticle : m_WrittenArticles) {

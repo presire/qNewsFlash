@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
-project(qNewsFlash VERSION 0.3.5 LANGUAGES CXX)
+project(qNewsFlash VERSION 0.3.6 LANGUAGES CXX)
 
 
 # Linuxのみビルドを許可
-if(NOT UNIX OR APPLE)
+if(NOT (UNIX AND NOT APPLE AND NOT ${CMAKE_SYSTEM_NAME} MATCHES "BSD"))
   message(FATAL_ERROR "本ソフトウェアは、Linuxでのみビルドできます")
 endif()
 
@@ -61,17 +61,19 @@ link_directories(${LIBXML2_LIBRARY_DIRS})
 
 
 # pkg-configを使用してQtライブラリを検索
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Network)
-#find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Network)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Network)
+
 if(QT_VERSION_MAJOR EQUAL 5)
-    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Network)
+    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Network)
 elseif(QT_VERSION_MAJOR EQUAL 6)
-    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Network Core5Compat)
+    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Network)
+
+    # OpenSSL 3を検索
+    find_package(OpenSSL 3 REQUIRED)
 endif()
 
 ## Qtのpkg-configファイル
 pkg_check_modules(QT_CORE     Qt${QT_VERSION_MAJOR}Core    REQUIRED IMPORTED_TARGET)
-pkg_check_modules(QT_GUI      Qt${QT_VERSION_MAJOR}Gui     REQUIRED IMPORTED_TARGET)
 pkg_check_modules(QT_NETWORK  Qt${QT_VERSION_MAJOR}Network REQUIRED IMPORTED_TARGET)
 
 ## Qt 5.15未満はビルドエラー
@@ -97,26 +99,11 @@ target_compile_definitions(qNewsFlash PRIVATE
         $<$<CONFIG:Debug>:_DEBUG>
 )
 
-## バージョンが0.1.0未満の場合、_BELOW_0_1_0プリプロセッサを定義
-#if(PROJECT_VERSION VERSION_LESS 0.1.0)
-#    target_compile_definitions(qNewsFlash PRIVATE
-#        _BELOW_0_1_0
-#    )
-#endif()
-
-## バージョンプリプロセッサを定義 (x.y)
-#target_compile_definitions(qNewsFlash PRIVATE
-#    -D${PROJECT_NAME}_${PROJECT_VERSION_MAJOR}_${PROJECT_VERSION_MINOR}
-#)
-
-### バージョンプリプロセッサを定義 (x.y.z)
-#target_compile_definitions(qNewsFlash PRIVATE
-#    -D${PROJECT_NAME}_${PROJECT_VERSION_MAJOR}_${PROJECT_VERSION_MINOR}_${PROJECT_VERSION_PATCH}
-#)
-
+## バージョンプリプロセッサを定義 (x.y.z)
 target_compile_definitions(qNewsFlash PRIVATE
     -DQNEWSFLASH_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
     -DQNEWSFLASH_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    -DQNEWSFLASH_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
 ## ARMまたはAARCH64かどうかを確認
@@ -147,26 +134,32 @@ target_compile_definitions(qNewsFlash PRIVATE
 )
 
 
-# libxml2のヘッダファイル
-target_include_directories(qNewsFlash PRIVATE
-        ${LIBXML2_INCLUDE_DIRS}
-)
+# ヘッダファイル
+if(${QT_VERSION_MAJOR} EQUAL 5)
+    target_include_directories(qNewsFlash PRIVATE
+            ${LIBXML2_INCLUDE_DIRS}
+    )
+elseif(${QT_VERSION_MAJOR} EQUAL 6)
+    target_include_directories(qNewsFlash PRIVATE
+            ${LIBXML2_INCLUDE_DIRS}
+            ${OPENSSL_INCLUDE_DIR}
+    )
+endif()
 
 
 if(QT_VERSION_MAJOR EQUAL 5)
     target_link_libraries(qNewsFlash PRIVATE
             Qt${QT_VERSION_MAJOR}::Core
-            Qt${QT_VERSION_MAJOR}::Gui
             Qt${QT_VERSION_MAJOR}::Network
             ${LIBXML2_LIBRARIES}
     )
 elseif(QT_VERSION_MAJOR EQUAL 6)
     target_link_libraries(qNewsFlash PRIVATE
             Qt${QT_VERSION_MAJOR}::Core
-            Qt${QT_VERSION_MAJOR}::Gui
             Qt${QT_VERSION_MAJOR}::Network
-            Qt${QT_VERSION_MAJOR}::Core5Compat
             ${LIBXML2_LIBRARIES}
+            OpenSSL::SSL
+            OpenSSL::Crypto
     )
 endif()
 
