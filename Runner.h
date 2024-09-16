@@ -20,6 +20,7 @@
 #include <memory>
 #include "JiJiFlash.h"
 #include "Article.h"
+#include "WriteMode.h"
 #include "Poster.h"
 
 
@@ -50,11 +51,14 @@ private:  // Variables
 #endif
 
     // インターバルタイマ
-    // Systemdサービスで起動している場合に使用する
+    // 通常実行 または Systemdサービスで起動している場合に使用する
     QTimer                                  m_timer;            // ニュース記事を取得するためのインターバル時間をトリガとするタイマ
     QTimer                                  m_JiJiTimer;        // 時事ドットコムの速報記事を取得するためのインターバル時間をトリガとするタイマ
+    QTimer                                  m_BottomTimer;      // スレッドに!bottomコマンドを書き込むためのインターバル時間をトリガとするタイマ
+                                                                // 書き込みモード2 および 書き込みモード3の一般ニュース記事のみ
     unsigned long long                      m_interval;         // ニュース記事を取得する時間間隔
     unsigned long long                      m_JiJiinterval;     // 時事ドットコムから速報ニュースを取得する時間間隔
+    unsigned long long                      m_Bottominterval;   // スレッドに!bottomコマンドを書き込む時間間隔
 
     // News API (ニュースサイト)
     bool                                    m_bNewsAPI;         // News APIからニュース記事を取得するかどうか
@@ -71,7 +75,7 @@ private:  // Variables
     // 共同通信 (ニュースサイト)
     bool                                    m_bKyodo;           // 共同通信からニュース記事を取得するかどうか
     QString                                 m_KyodoRSS;         // 共同通信からニュース記事を取得するためのRSS (URL)
-    bool                                    m_NewsOnly;         // 共同通信から取得するニュース記事の種類をニュースのみに絞るかどうか
+    bool                                    m_KyodoNewsOnly;    // 共同通信から取得するニュース記事の種類をニュースのみに絞るかどうか
                                                                 // ニュース以外の記事では、ビジネス関連やライフスタイル等の記事がある
 
     // 朝日新聞デジタル (ニュースサイト)
@@ -125,17 +129,18 @@ private:  // Variables
     QList<Article>                          m_WrittenArticles;        // スレッドに書き込み済みのニュース記事群 (ログファイルに保存されているニュース記事群のこと)
 
     // スレッドに関する情報
-    THREAD_INFO                             m_ThreadInfo;       // 記事を書き込むスレッドの情報
-    bool                                    m_changeTitle;      // スレッドのタイトルを変更するかどうか
-                                                                // 防弾嫌儲およびニュース速報(Libre)等のスレッドのタイトルが変更できる掲示板でのみ使用可能
-    QString                                 m_RequestURL,       // 記事を書き込むためのPOSTデータを送信するURL
-                                            m_ThreadURL,        // 書き込むスレッドのURL
-                                            m_ThreadTitle,      // 書き込み済みのスレッドのタイトル
-                                            m_ThreadXPath;      // スレッドのレス数を取得するためのXPath
-    int                                     m_maxThreadNum;     // スレッドの最大レス数
-    QString                                 m_ExpiredElement,   // スレッドが落ちた時のスレッドタイトル名 (現在は未使用)
-                                            m_ExpiredXpath;     // スレッドが落ちた時のスレッドタイトル名を取得するXPath
-                                                                // 掲示板上の新規作成したスレッドのタイトルを取得する場合にも使用
+    THREAD_INFO                             m_ThreadInfo;       // ニュース記事を書き込むスレッドの情報
+
+    // 書き込み用オブジェクト
+    WriteMode                               *m_pWriteMode;      // 書き込み用オブジェクト
+
+    // 書き込みモード
+    int                                     m_WriteMode;        // 書き込みモード 1 : 1つのスレッドにニュース記事および時事ドットコムの速報ニュースを書き込むモード
+                                                                // 書き込みモード 2 : ニュース記事および時事ドットコムの速報ニュースにおいて、常に新規スレッドを立てるモード
+                                                                // 書き込みモード 3 : 時事ドットコムの速報ニュース以外は、常に新規スレッドを立てるモード
+
+    // スレッドの書き込みに関する情報
+    WRITE_INFO                              m_WriteInfo;        // スレッドの書き込みに関する情報
 
     // その他設定ファイルに関する情報
     long long                               m_MaxParagraph;     // 本文の一部を抜粋する場合の最大文字数
@@ -151,16 +156,12 @@ private:  // Methods
     int            getConfiguration(QString &filepath);         // このソフトウェアの設定ファイルの情報を取得
 
 #if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR < 1)
-    int         setLogFile();                                   // このソフトウェアのログ情報を保存するファイルのパスを設定
+    int            checkLogFile();                              // このソフトウェアのログ情報を保存するファイルのパスを設定
                                                                 // ログ情報とは、本日の書き込み済みのニュース記事群を指す
 #endif
 
-    static int     setLogFile(QString &filepath);               // このソフトウェアのログ情報を保存するファイルのパスを設定
+    static int     checkLogFile(QString &filepath);             // このソフトウェアのログ情報を保存するファイルのパスを設定
                                                                 // ログ情報とは、書き込み済みのニュース記事を指す
-    int            deleteLogNotToday();                         // ログ情報を保存するファイルから、昨日以前(昨日も含む)の書き込み済みのニュース記事を削除
-    int            getDatafromWrittenLog();                     // ログ情報を保存するファイルから、本日の書き込み済みのニュース記事を取得
-                                                                // また、取得した記事群のデータは、メンバ変数m_WrittenArticlesに保存
-                                                                // ただし、このメソッドは、deleteLogNotToday()メソッドの直後に実行する必要がある
     void           itemTagsforJiJi(xmlNode *a_node);            // 時事ドットコムのニュース記事(RSS)を分解して取得
     void           itemTagsforKyodo(xmlNode *a_node);           // 共同通信のニュース記事(RSS)を分解して取得
     void           itemTagsforAsahi(xmlNode *a_node);           // 朝日新聞デジタルのニュース記事(RSS)を分解して取得
@@ -172,22 +173,8 @@ private:  // Methods
     static QString convertDate(QString &strDate);               // 時事ドットコム、ロイター通信のニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
     static QString convertDateHanJ(QString &strDate);           // ハンギョレジャパンのニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
     static bool    isToday(const QString &dateString);          // ニュース記事が今日の日付かどうかを確認
-    static qint64  GetEpocTime();                               // 現在のエポックタイム (UNIX時刻) を秒単位で取得
     bool           isHoursAgo(const QString &dateString) const; // ニュース記事が数時間前の日付かどうかを確認
-    QString        replaceSubjectToken(QString subject,         // 文字列 %tトークンをスレッドのタイトルに置換
-                                       QString title);
     Article        selectArticle();                             // 取得したニュース記事群からランダムで1つを選択
-    int            checkLastThreadNum();                        // 書き込むスレッドのレス数が上限に達しているかどうかを確認
-    int            CompareThreadTitle(const QUrl &url,          // !chttコマンドでスレッドのタイトルが正常に変更されているかどうかを確認
-                                      QString &title);          // !chttコマンドは、防弾嫌儲系の掲示板のみ使用可能
-    int            UpdateThreadJson(const QString &title);      // スレッド情報 (スレッドのタイトル、スレッドのURL、スレッド番号) を設定ファイルに保存
-    int            writeLog(Article &article);                  // 書き込み済みのニュース記事をJSONファイルに保存
-    int            updateDateJson(const QString &currentDate);  // 最後にニュース記事を取得した日付を設定ファイルに保存 (フォーマット : "yyyy/M/d")
-
-#if (QNEWSFLASH_VERSION_MAJOR == 0 && QNEWSFLASH_VERSION_MINOR < 1)
-    int            writeJSON(Article &article);                 // 選択したニュース記事をJSONファイルに保存
-    int            truncateJSON();                              // スレッド書き込み用のJSONファイルの内容を空にする
-#endif
 
 public:  // Methods
 
@@ -210,18 +197,19 @@ signals:
     void TokyoNPfinished();     // 東京新聞からニュース記事の取得の終了を知らせるためのシグナル
 
 public slots:
-    void run();                 // このソフトウェアを最初に実行する時にのみ実行するメイン処理
-    void fetch();               // ニュース記事の取得
-    void fetchNewsAPI();        // News APIからニュース記事の取得後に実行するスロット
-    void fetchJiJiRSS();        // 時事ドットコムからニュース記事の取得後に実行するスロット
-    void fetchKyodoRSS();       // 共同通信からニュース記事の取得後に実行するスロット
-    void fetchAsahiRSS();       // 朝日新聞デジタルからニュース記事の取得後に実行するスロット
-    void fetchCNetRSS();        // CNET Japanからニュース記事の取得後に実行するスロット
-    void fetchHanJRSS();        // ハンギョレジャパンからニュース記事の取得後に実行するスロット
-    void fetchReutersRSS();     // ロイター通信からニュース記事の取得後に実行するスロット
-    void fetchTokyoNP();        // 東京新聞からニュース記事の取得後に実行するスロット
-    void JiJiFlashfetch();      // 時事ドットコムから速報記事の取得
-    void onReadyRead();         // ノンブロッキングでキー入力を受信するスロット
+    void run();                     // このソフトウェアを最初に実行する時にのみ実行するメイン処理
+    void fetchNonBreakingNews();    // 速報ニュース以外のニュース記事の取得するスロット
+    void fetchNewsAPI();            // News APIからニュース記事の取得後に実行するスロット
+    void fetchJiJiRSS();            // 時事ドットコムからニュース記事の取得後に実行するスロット
+    void fetchKyodoRSS();           // 共同通信からニュース記事の取得後に実行するスロット
+    void fetchAsahiRSS();           // 朝日新聞デジタルからニュース記事の取得後に実行するスロット
+    void fetchCNetRSS();            // CNET Japanからニュース記事の取得後に実行するスロット
+    void fetchHanJRSS();            // ハンギョレジャパンからニュース記事の取得後に実行するスロット
+    void fetchReutersRSS();         // ロイター通信からニュース記事の取得後に実行するスロット
+    void fetchTokyoNP();            // 東京新聞からニュース記事の取得後に実行するスロット
+    void JiJiFlashfetch();          // 時事ドットコムから速報記事の取得するスロット
+    void bottomThread();            // 書き込み済みのスレッドに!bottomコマンドを書き込むスロット
+    void onReadyRead();             // ノンブロッキングでキー入力を受信するスロット
 };
 
 #endif // RUNNER_H

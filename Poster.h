@@ -17,21 +17,30 @@
 // スレッド情報
 struct THREAD_INFO
 {
+    // デフォルトコンストラクタ
     THREAD_INFO() = default;
 
+    // 既存のコンストラクタ
     [[maybe_unused]] THREAD_INFO(QString _subject, QString _from, QString _mail, QString _message,
                                  QString _bbs, QString _time, QString _key) :
                                  subject(std::move(_subject)), from(std::move(_from)), mail(std::move(_mail)), bbs(std::move(_bbs)),
                                  message(std::move(_message)), time(std::move(_time)), key(std::move(_key)) {}
-    QString subject     = "";   // スレッドのタイトル (スレッドを新規作成する場合のみ入力)
-    QString from        = "";
-    QString mail        = "";   // メール欄
-    QString message     = "";   // 書き込む内容
-    QString bbs         = "";   // BBS名
-    QString time        = "";   // エポックタイム (UNIXタイムまたはPOSIXタイムとも呼ばれる)
-    QString key         = "";   // スレッド番号 (スレッドに書き込む場合のみ入力)
-    bool    shiftjis    = true;
-    QString expiredXPath = "";  // スレッドのタイトルを抽出するXPath
+
+    THREAD_INFO(const QString &_subject, QString &_from, const QString &_mail, const QString &_message,
+                const QString &_bbs, const QString &_time, const QString &_key, bool &_shiftjis, const QString &_xpath)
+                : subject(_subject), from(_from), mail(_mail), message(_message),
+                  bbs(_bbs), time(_time), key(_key), shiftjis(_shiftjis), expiredXPath(_xpath)
+    {}
+
+    QString subject      = "";      // スレッドのタイトル (スレッドを新規作成する場合のみ入力)
+    QString from         = "";      // 名前欄
+    QString mail         = "";      // メール欄
+    QString message      = "";      // 書き込む内容
+    QString bbs          = "";      // BBS名
+    QString time         = "";      // エポックタイム (UNIXタイムまたはPOSIXタイムとも呼ばれる)
+    QString key          = "";      // スレッド番号 (スレッドに書き込む場合のみ入力)
+    bool    shiftjis     = true;    // Shift-JSIエンコーディングの有効 / 無効
+    QString expiredXPath = "";      // スレッドのタイトルを抽出するXPath
 };
 
 

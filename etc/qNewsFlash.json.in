@@ -59,7 +59,6 @@
     },
     "thread": {
         "bbs": "",
-        "chtt": false,
         "expiredelement": "指定されたスレッドは存在しません",
         "expiredxpath": "/html/head/title",
         "from": "",
@@ -71,7 +70,16 @@
         "subject": "ニュースを貼るスレ - %t",
         "threadtitle": "",
         "threadurl": "",
-        "threadxpath": "/html/body/div/dl[@class='thread']/div/@id"
+        "threadxpath": "/html/body/div/dl[@class='thread']/div/@id",
+        "writemode": 1
+    },
+    "threadcommand": {
+        "bottom": {
+            "enable": false,
+            "interval": 180
+        },
+        "chtt": false,
+        "hogo": false
     },
     "tokyonp": {
         "enable": false,
