@@ -84,9 +84,9 @@
     "tokyonp": {
         "enable": false,
         "jsonpath": "/html/head/script[@type='application/ld+json']",
-        "newsxpath": "/html/body/div[@id='document']/div[@id='document-wrapper']/main[contains(@class, 'main-container')]/div[contains(@class, 'content-area')]/div[contains(@class, 'l-wrapper')]/div[contains(@class, 'l-container')]/div[contains(@class, 'cmp-m-catelst002')]/div[contains(@class, 'cmp-lst001 col-2 reverse')]/div[contains(@class, 'l-artlst001')]/ul[contains(@class, 'list')]/li[contains(@class, 'item')]/div[contains(@class, 'cmp-thmb001 js-link')]/@data-href",
+        "newsxpath": "/html/body/div[@id='document']/div[@id='document-wrapper']/main[contains(@class, 'main-container')]/div[contains(@class, 'content-area')]/div[contains(@class, 'l-wrapper')]/div[contains(@class, 'l-container')]/div[contains(@class, 'cmp-m-catelst002')]/div[contains(@class, 'cmp-lst001 col-2 reverse')]/div[contains(@class, 'l-artlst001')]/ul[contains(@class, 'list')]/li[contains(@class, 'item')]/div[contains(@class, 'cmp-thmb001 ratio3-2 js-link')]/@data-href",
         "toppage": "https://www.tokyo-np.co.jp",
-        "topxpath": "/html/body/div[@id='document']/div[@id='document-wrapper']/main[contains(@class, 'main-container')]/div[contains(@class, 'content-area')]/div[contains(@class, 'l-wrapper')]/div[contains(@class, 'l-container')]/div[contains(@class, 'cmp-m-catelst002')]/div[contains(@class, 'cmp-thmb001 pt-20 pb-20')]/div[contains(@class, 'wrp lv2')]/div[contains(@class, 'thumb')]/a/@href",
+        "topxpath": "/html/body/div[@id='document']/div[@id='document-wrapper']/main[contains(@class, 'main-container')]/div[contains(@class, 'content-area')]/div[contains(@class, 'l-wrapper')]/div[contains(@class, 'l-container')]/div[contains(@class, 'cmp-m-catelst002')]/div[contains(@class, 'cmp-thmb001 ratio3-2 pt-20 pb-20')]/div[contains(@class, 'wrp lv2')]/div[contains(@class, 'thumb')]/a/@href",
         "url": "https://www.tokyo-np.co.jp"
     },
     "update": "",
