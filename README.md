@@ -17,13 +17,20 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 * 時事ドットコム  
 
 * 時事ドットコム (速報ニュース)  
-  XPath式を使用して速報ニュース全体を取得しています。  
+  XPath式を使用して速報ニュースを取得しています。  
   <u>**速報ニュースは、他のニュース記事とは別に書き込みされます。**</u>  
   <br>
   <u>※注意</u>  
   <u>XPath式を使用しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
 
 * 共同通信  
+
+* 共同通信 (速報ニュース)  
+  XPath式を使用して速報ニュースを取得しています。  
+  <u>**共同通信の速報ニュースは時事ドットコムの速報ニュースと同様、他のニュース記事とは別に書き込みされます。**</u>  
+  <br>
+  <u>※注意</u>  
+  <u>XPath式を使用しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
 
 * 朝日新聞デジタル  
   ただし、RSSフィードに掲載されている記事には有料記事が多いため、デフォルトでは無効です。  
@@ -32,7 +39,7 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
   ニュース記事の概要を取得するためにXPath式を使用しています。  
   <br>
   <u>※注意</u>  
-  <u>XPath式を一部使用しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
+  <u>XPath式を使用して記事の本文を取得しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
 
 * ハンギョレ新聞  
 
@@ -40,10 +47,10 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
   ニュース記事の概要を取得するためにXPath式を使用しています。  
   <br>
   <u>※注意</u>  
-  <u>XPath式を一部使用しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
+  <u>XPath式を使用して記事の本文を取得しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
 
 * 東京新聞  
-  XPath式を使用してニュース記事全体を取得しています。  
+  XPath式を使用して東京新聞のニュース記事全体を取得しています。  
   <br>
   <u>※注意</u>  
   <u>XPath式を使用しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
@@ -76,11 +83,7 @@ Raspberry Pi上での動作は確認済みです。
 <br>
 
 今後の予定  
-* !hogoコマンド機能の実装  
-  1つのスレッドに対してニュース記事を書き込む場合、該当スレッドの2レス目以降に!hogoコマンドを書き込む。  
-  これは、書き込みモード1、および、書き込みモード3の時事ドットコムの速報ニュースのスレッドに対して機能します。  
-  <br>
-  <code>!hogo</code>コマンドが使用できる場合に有効です。</u>  
+-  
 <br>
 <br>
 
@@ -553,6 +556,47 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
     <br>
     デフォルトで取得する記事は、ニュースのみです。  
     <br>
+* kyodoflash  
+  * enable  
+    デフォルト値 : <code>false</code>  
+    47NEWSから共同通信の速報ニュースを取得するかどうかを指定します。  
+    速報ニュースは、他のニュース記事とは別に書き込みされます。  
+    デフォルトは無効です。  
+    <br>
+  * interval  
+    デフォルト値 : <code>"600"</code>  
+    47NEWSから共同通信の速報ニュースを取得する時間間隔 (秒) を指定します。  
+    デフォルト値は600[秒] (10分間隔で速報ニュースを取得) です。  
+    <br>
+    0を指定した場合は、強制的に600[秒] (10[分]) に指定されます。  
+    60秒未満 (1[分]未満) を指定した場合は、強制的に60[秒] (1[分]) に指定されます。  
+    0未満の値が指定された場合はエラーとなり、本ソフトウェアを終了します。  
+    <br>
+  * basisurl  
+    デフォルト値 : <code>"https://www.47news.jp"</code>  
+    47NEWSでは、トップページのURLを基準にニュース記事が存在します。  
+    もし、この基準が変更された場合は、この値を変更します。  
+    <br>
+  * flashurl  
+    デフォルト値 : <code>"https://www.47news.jp/bulletin"</code>  
+    47NEWSから共同通信の速報ニュースが存在するURLを指定します。  
+    <br>
+  * flashxpath  
+    デフォルト値 : <code>"/html/body/div[@id='__next']/div/div[@id='wrapper']/main/div[@class='page_layout layout_pc_mt2']/div[@class='container']/div[@class='content_width']/div[@class='row is_row_type_main_side']/div[@class='col_main main_body']/div[@class='main_row2']/div[@class='post_items post_items_pc_mb1']/a[1]/@href"</code>  
+    上記の<code>flashurl</code>に指定したURLから、公開日の最も新しい速報ニュースのURLを1件のみ取得するXPath式を指定します。  
+    <br>
+  * titlexpath  
+    デフォルト値 : <code>"/html/head/meta[@property='og:title']/@content"</code>  
+    上記の<code>flashxpath</code>で取得した速報ニュースのURLからタイトルを取得するXPath式を指定します。  
+    <br>
+  * paraxpath  
+    デフォルト値 : <code>"/html/body/div[@id='__next']/div/div[@id='wrapper']/main/div[@class='page_layout layout_pc_mt2']/div[@class='container']/div[@class='content_width']/div[@class='row is_row_type_main_side']/div[@class='col_main main_body']/div[@class='post_items']/div[@id='detail_area']/div[@class='item_body']/p"</code>  
+    上記の<code>flashxpath</code>で取得した速報ニュースのURLから本文を取得するXPath式を指定します。  
+    <br>
+  * pubdatexpath  
+    デフォルト値 : <code>"/html/body/div[@id='__next']/div/div[@id='wrapper']/main/div[@class='page_layout layout_pc_mt2']/div[@class='container']/div[@class='content_width']/div[@class='row is_row_type_main_side']/div[@class='col_main main_body']/div[@class='post_items']/div[@id='detail_area']/div[@class='item_time']"</code>  
+    上記の<code>flashxpath</code>で取得した速報ニュースのURLから公開日を取得するXPath式を指定します。  
+    <br>
 * asahi  
   * enable  
     デフォルト値 : <code>false</code>  
@@ -774,6 +818,15 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
     POSTデータの文字コードをShift-JISに変換するかどうかを指定します。  
     0ch系は、Shift-JISを指定 (<code>**true**</code>) することを推奨します。  
     <br>
+  * ishogo  
+    デフォルト値 : <code>false</code>  
+    threadcommandオブジェクトのhogoキーが<code>true</code>の場合、  
+    スレッドに!hogoコマンドが書き込まれると自動的に<code>true</code>に更新されます。  
+    <br>
+    <u>防弾嫌儲系の掲示板において、<code>!hogo</code>コマンドが使用できる場合に有効です。</u>  
+    <br>
+    ユーザはこの値を書き換えないようにしてください。  
+    <br>
   * writemode  
     デフォルト値 : <code>1</code>  
     書き込みモードを指定します。  
@@ -820,10 +873,10 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
       <br>
   * hogo  
     デフォルト値 : <code>false</code>  
-    **<u>現在未実装</u>**  
-    <br>
-    2レス目以降に、!hogoコマンドを書き込みます。  
+    スレッドの2レス目以降 (次のニュース記事を書き込む時) に、!hogoコマンドを自動的に書き込みます。  
     これにより、時限dat落ちルールを回避します。  
+    <br>
+    これは、書き込みモード1、および、書き込みモード3の速報ニュースのスレッドに対して機能します。  
     <br>
     <u>防弾嫌儲系の掲示板において、<code>!hogo</code>コマンドが使用できる場合に有効です。</u>  
     <br>

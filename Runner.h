@@ -16,9 +16,9 @@
 
 #include <libxml/parser.h>
 #include <libxml/tree.h>
-#include <tuple>
 #include <memory>
 #include "JiJiFlash.h"
+#include "KyodoFlash.h"
 #include "Article.h"
 #include "WriteMode.h"
 #include "Poster.h"
@@ -54,10 +54,12 @@ private:  // Variables
     // 通常実行 または Systemdサービスで起動している場合に使用する
     QTimer                                  m_timer;            // ニュース記事を取得するためのインターバル時間をトリガとするタイマ
     QTimer                                  m_JiJiTimer;        // 時事ドットコムの速報記事を取得するためのインターバル時間をトリガとするタイマ
+    QTimer                                  m_KyodoTimer;       // 共同通信の速報記事を取得するためのインターバル時間をトリガとするタイマ
     QTimer                                  m_BottomTimer;      // スレッドに!bottomコマンドを書き込むためのインターバル時間をトリガとするタイマ
                                                                 // 書き込みモード2 および 書き込みモード3の一般ニュース記事のみ
     unsigned long long                      m_interval;         // ニュース記事を取得する時間間隔
     unsigned long long                      m_JiJiinterval;     // 時事ドットコムから速報ニュースを取得する時間間隔
+    unsigned long long                      m_Kyodointerval;    // 共同通信から速報ニュースを取得する時間間隔
     unsigned long long                      m_Bottominterval;   // スレッドに!bottomコマンドを書き込む時間間隔
 
     // News API (ニュースサイト)
@@ -77,6 +79,9 @@ private:  // Variables
     QString                                 m_KyodoRSS;         // 共同通信からニュース記事を取得するためのRSS (URL)
     bool                                    m_KyodoNewsOnly;    // 共同通信から取得するニュース記事の種類をニュースのみに絞るかどうか
                                                                 // ニュース以外の記事では、ビジネス関連やライフスタイル等の記事がある
+    bool                                    m_bKyodoFlash;      // 共同通信から速報ニュースを取得するかどうか
+    KYODOFLASHINFO                          m_KyodoFlashInfo;   // 共同通信の速報ニュースの取得に必要な情報
+
 
     // 朝日新聞デジタル (ニュースサイト)
     bool                                    m_bAsahi;           // 朝日新聞デジタルからニュース記事を取得するかどうか
@@ -85,9 +90,9 @@ private:  // Variables
     // CNET Japan (ニュースサイト)
     bool                                    m_bCNet;            // CNET Japanからニュース記事を取得するかどうか
     QString                                 m_CNETRSS;          // CNET Japanからニュース記事を取得するためのRSS (URL)
-    QString                                 m_CNETParaXPath;    // CNET Japanからニュース記事の概要を取得するためのXPath式
-                                                                // RSSにあるニュース記事の概要欄には不要な情報が多いため、
-                                                                // 該当するニュース記事のURLから記事の概要のみを抽出している
+    QString                                 m_CNETParaXPath;    // CNET Japanからニュース記事の本文を取得するためのXPath式
+                                                                // RSSにあるニュース記事の本文には不要な情報が多いため、
+                                                                // 該当するニュース記事のURLから記事の本文のみを抽出している
 
     // ハンギョレ新聞 (ニュースサイト)
     bool                                    m_bHanJ;            // ハンギョレジャパンからニュース記事を取得するかどうか
@@ -99,8 +104,8 @@ private:  // Variables
     bool                                    m_bReuters;         // ロイター通信からニュース記事を取得するかどうか
     QString                                 m_ReutersRSS;       // ロイター通信からニュース記事の概要を取得するためのRSS (URL)
     QString                                 m_ReutersParaXPath; // ロイター通信からニュース記事の概要を取得するためのXPath式
-                                                                // RSSにあるニュース記事の概要欄の値が空欄のため、
-                                                                // 該当するニュース記事のURLから記事の概要のみを抽出している
+                                                                // RSSにあるニュース記事の本文の値が空欄のため、
+                                                                // 該当するニュース記事のURLから記事の本文のみを抽出している
 
     // 東京新聞 (ニュースサイト)
     bool                                    m_bTokyoNP;         // 東京新聞からニュース記事を取得するかどうか
@@ -135,9 +140,9 @@ private:  // Variables
     WriteMode                               *m_pWriteMode;      // 書き込み用オブジェクト
 
     // 書き込みモード
-    int                                     m_WriteMode;        // 書き込みモード 1 : 1つのスレッドにニュース記事および時事ドットコムの速報ニュースを書き込むモード
-                                                                // 書き込みモード 2 : ニュース記事および時事ドットコムの速報ニュースにおいて、常に新規スレッドを立てるモード
-                                                                // 書き込みモード 3 : 時事ドットコムの速報ニュース以外は、常に新規スレッドを立てるモード
+    int                                     m_WriteMode;        // 書き込みモード 1 : 1つのスレッドにニュース記事および速報ニュースを書き込むモード
+                                                                // 書き込みモード 2 : ニュース記事および速報ニュースにおいて、常に新規スレッドを立てるモード
+                                                                // 書き込みモード 3 : 速報ニュース以外は、常に新規スレッドを立てるモード
 
     // スレッドの書き込みに関する情報
     WRITE_INFO                              m_WriteInfo;        // スレッドの書き込みに関する情報
@@ -208,6 +213,7 @@ public slots:
     void fetchReutersRSS();         // ロイター通信からニュース記事の取得後に実行するスロット
     void fetchTokyoNP();            // 東京新聞からニュース記事の取得後に実行するスロット
     void JiJiFlashfetch();          // 時事ドットコムから速報記事の取得するスロット
+    void KyodoFlashfetch();         // 共同通信から速報記事の取得するスロット
     void bottomThread();            // 書き込み済みのスレッドに!bottomコマンドを書き込むスロット
     void onReadyRead();             // ノンブロッキングでキー入力を受信するスロット
 };

@@ -1,9 +1,9 @@
 #ifndef JIJIFLASH_H
 #define JIJIFLASH_H
 
+#include <QObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
-#include <QObject>
 #include <tuple>
 #include <memory>
 
@@ -53,9 +53,6 @@ public:     // Methods
     int             FetchFlash();                                   // 時事ドットコムから速報記事を取得する
     [[nodiscard]] std::tuple<QString, QString, QString, QString>    // フォーマットに合わせた速報記事を取得する
                     getArticleData() const;
-
-signals:
-
 };
 
 #endif // JIJIFLASH_H

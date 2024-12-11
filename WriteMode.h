@@ -77,6 +77,8 @@ private:    // Methods
     int            CompareThreadTitle(const QUrl &url,                      // !chttコマンドでスレッドのタイトルが正常に変更されているかどうかを確認
                                       QString &title);                      // !chttコマンドは、防弾嫌儲系の掲示板のみ使用可能
     int            updateThreadJson(const QString &title);                  // スレッド情報 (スレッドのタイトル、スレッドのURL、スレッド番号) を設定ファイルに保存
+    bool           isHogoValue();                                           // スレッドに!hogoコマンドが書かれているかどうかを確認
+    int            updateHogoJson(bool isHogo);                             // !hogoコマンド (有効 / 無効) の状態を設定ファイルに保存
     int            writeLog(Article       &article,                         // 書き込み済みのニュース記事をJSONファイルに保存
                             const QString &threadtitle,
                             const QString &threadurl,

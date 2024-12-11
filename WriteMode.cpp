@@ -189,6 +189,11 @@ int WriteMode::writeMode1()
                     // スレッド情報の保存に失敗
                     return WRITEERROR::POSTERROR;
                 }
+
+                if (updateHogoJson(false)) {
+                    // スレッド情報の保存に失敗
+                    return WRITEERROR::POSTERROR;
+                }
             }
         }
         else {
@@ -196,6 +201,26 @@ int WriteMode::writeMode1()
 
             // スレッドのタイトルを変更するかどうか (防弾嫌儲およびニュース速報(Libre)等の掲示板で使用可能)
             if (m_WriteInfo.ChangeTitle) m_ThreadInfo.message.prepend("!chtt");
+
+            // !hogoコマンドを使用するかどうか
+            bool isHogo = false;
+            if (m_WriteInfo.SaveThread) {
+                try {
+                    isHogo = isHogoValue();
+                    if (!isHogo) {
+                        // "!hogo"コマンドを使用
+#if defined(Q_OS_WIN)
+                        QString newLine = QStringLiteral("\r\n");
+#else
+                        QString newLine = QStringLiteral("\n");
+#endif
+                        m_ThreadInfo.message.append(newLine + newLine + QString("!hogo"));
+                    }
+                }
+                catch (std::runtime_error ex) {
+                    return WRITEERROR::POSTERROR;
+                }
+            }
 
             // 既存のスレッドに書き込み
             if (poster.PostforWriteThread(QUrl(m_WriteInfo.RequestURL), m_ThreadInfo)) {
@@ -240,6 +265,25 @@ int WriteMode::writeMode1()
                     }
                 }
             }
+
+            // !hogoコマンドがスレッドに書かれているかどうかを確認
+            if (m_WriteInfo.SaveThread && !isHogo) {
+                // !hogoコマンドが有効の場合
+                try {
+                    // "ishogo"キーの値をtrueにする
+                    QMutexLocker logLocker(&m_logMutex);
+                    if (updateHogoJson(true)) {
+                        // スレッド情報の保存に失敗
+                        return WRITEERROR::POSTERROR;
+                    }
+                }
+                catch (std::runtime_error &e) {
+                    return WRITEERROR::POSTERROR;
+                }
+                catch (const std::exception& e) {
+                    return WRITEERROR::POSTERROR;
+                }
+            }
         }
     }
     else if (iExpired == 1) {
@@ -269,9 +313,15 @@ int WriteMode::writeMode1()
         m_WriteInfo.ThreadTitle    = poster.GetNewThreadTitle();
 
         // スレッド情報 (スレッドのタイトル、URL、スレッド番号) を設定ファイルに保存
+        // また、新規スレッドのため"ishogo"キーの値をfalseにする
         {
             QMutexLocker confLocker(&m_confMutex);
             if (updateThreadJson(m_WriteInfo.ThreadTitle)) {
+                // スレッド情報の保存に失敗
+                return -1;
+            }
+
+            if (updateHogoJson(false)) {
                 // スレッド情報の保存に失敗
                 return -1;
             }
@@ -612,6 +662,137 @@ int WriteMode::updateThreadJson(const QString &title)
 }
 
 
+// スレッドに!hogoコマンドが書かれているかどうかを確認
+bool WriteMode::isHogoValue()
+{
+    QFileInfo configFileInfo(m_SysConfFile);
+    QString lockFilePath = configFileInfo.dir().filePath(configFileInfo.baseName() + ".lock");
+    QLockFile lockFile(lockFilePath);
+
+    // 最大30秒の間に、システムは繰り返しロックの取得を試みる
+    if (!lockFile.tryLock(30000)) {
+        std::cerr << QString("エラー: 30秒以内に設定ファイルのロックの取得に失敗").toStdString() << std::endl;
+        throw std::runtime_error("");
+    }
+
+    bool isHogo = false;
+
+    // 設定ファイルを読み込む
+    QJsonDocument doc;
+    QFile File(m_SysConfFile);
+
+    try {
+        // 設定ファイルを開く
+        if(!File.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            lockFile.unlock();
+            throw std::runtime_error(QString("設定ファイルのオープンに失敗しました %1").arg(File.errorString()).toStdString());
+        }
+
+        // 設定ファイルの内容を読み込む
+        doc = QJsonDocument::fromJson(File.readAll());
+
+        if (!doc.isObject()) {
+            throw std::runtime_error("設定ファイルが有効なJSONオブジェクトではありません");
+        }
+
+        QJsonObject obj = doc.object();
+
+        // qNewsFlash.jsonファイルから"thread"オブジェクトの"ishogo"キーの値を取得
+        auto threadObject = obj["thread"].toObject();
+        isHogo            = threadObject["ishogo"].toBool();
+    }
+    catch (const std::runtime_error &e) {
+        if (File.isOpen())          File.close();
+        if (lockFile.isLocked())    lockFile.unlock();
+        std::cerr << QString("エラー: %1").arg(e.what()).toStdString() << std::endl;
+
+        throw;
+    }
+    catch (const std::exception &e) {
+        if (File.isOpen())          File.close();
+        if (lockFile.isLocked())    lockFile.unlock();
+        std::cerr << QString("エラー: %1").arg(e.what()).toStdString() << std::endl;
+
+        throw;
+    }
+
+    // ファイルを閉じる
+    File.close();
+
+    // ロックファイルを削除
+    lockFile.unlock();
+
+    return isHogo;
+}
+
+
+// !hogoコマンド (有効 / 無効) の状態を設定ファイルに保存
+int WriteMode::updateHogoJson(bool isHogo)
+{
+    QFileInfo configFileInfo(m_SysConfFile);
+    QString lockFilePath = configFileInfo.dir().filePath(configFileInfo.baseName() + ".lock");
+    QLockFile lockFile(lockFilePath);
+
+    // 最大30秒の間に、システムは繰り返しロックの取得を試みる
+    if (!lockFile.tryLock(30000)) {
+        std::cerr << QString("エラー: 30秒以内に設定ファイルのロックの取得に失敗").toStdString() << std::endl;
+        return -1;
+    }
+
+    QJsonDocument doc;
+    QFile File(m_SysConfFile);
+
+    // 設定ファイルを開く
+    if (!File.open(QIODevice::ReadWrite)) {
+        lockFile.unlock();
+        std::cerr << QString("エラー : 設定ファイルのオープンに失敗 %1").arg(m_SysConfFile).toStdString() << std::endl;
+
+        return -1;
+    }
+
+    try {
+        // 設定ファイルの内容を読み込む
+        doc = QJsonDocument::fromJson(File.readAll());
+
+        if (!doc.isObject()) {
+            throw std::runtime_error("設定ファイルが有効なJSONオブジェクトではありません");
+        }
+
+        QJsonObject obj = doc.object();
+
+        // 設定ファイルの"thread"オブジェクトの"ishogo"キーを更新
+        auto threadObj      = obj["thread"].toObject();
+        threadObj["ishogo"] = isHogo;
+
+        obj["thread"] = threadObj;
+        doc.setObject(obj);
+
+        // ファイルポインタを先頭に戻す
+        File.seek(0);
+
+        // 更新したJSONオブジェクトをファイルに書き込む
+        File.write(doc.toJson());
+        File.flush();
+        File.resize(File.pos());  // ファイルサイズを現在の位置に切り詰める
+    }
+    catch(const std::exception &ex) {
+        if (File.isOpen())       File.close();
+        if (lockFile.isLocked()) lockFile.unlock();
+        std::cerr << QString("エラー : %1").arg(ex.what()).toStdString() << std::endl;
+
+        return -1;
+    }
+
+    // 設定ファイルを閉じる
+    File.close();
+
+    // ロックファイルを削除
+    lockFile.unlock();
+
+    return 0;
+}
+
+
 // 書き込み済みのニュース記事をJSONファイルに保存
 int WriteMode::writeLog(Article &article, const QString &threadtitle, const QString &threadurl, const QString &key, bool bNewThread)
 {
@@ -738,7 +919,7 @@ int WriteMode::updateDateJsonWrapper(const QString &currentDate)
 
     // 最大30秒の間に、システムは繰り返しロックの取得を試みる
     if (!lockFile.tryLock(30000)) {
-        std::cerr << QString("エラー: 30秒以内に書き込み用ログファイルのロックの取得に失敗").toStdString() << std::endl;
+        std::cerr << QString("エラー: 30秒以内に設定ファイルのロックの取得に失敗").toStdString() << std::endl;
         return -1;
     }
 

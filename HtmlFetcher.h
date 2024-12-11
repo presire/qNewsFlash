@@ -41,6 +41,8 @@ public:   // Methods
                          int elementType);
     int     fetchElementJiJiFlashUrl(const QUrl &url, bool redirect,                    // 時事ドットコムの速報記事のURLにアクセスして、XPathで指定した値を取得する
                                      const QString &_xpath, int elementType);           // 速報記事の"<この速報の記事を読む>"の部分のリンクを取得する場合のみ
+    int     fetchParagraphKyodoFlash(const QUrl &url, bool redirect,                    // 共同通信の速報記事のURLにアクセスして、XPathで指定した本文を取得する
+                                     const QString &_xpath);
 
     int     fetchLastThreadNum(const QUrl &url, bool redirect, const QString &_xpath,   // 書き込むスレッドの最後尾のレス番号を取得する
                                int elementType);

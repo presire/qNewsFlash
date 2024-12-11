@@ -1,6 +1,8 @@
 #include <QCoreApplication>
 #include <QTimer>
-#include <QProcess>
+#include <pwd.h>
+#include <unistd.h>
+#include <iostream>
 #include "Runner.h"
 
 
@@ -9,28 +11,24 @@ int main(int argc, char *argv[])
     QCoreApplication app(argc, argv);
 
 #ifdef Q_OS_LINUX
+    // アプリケーションを実行しているユーザ名を取得
+    QString RunUser = "";
+    struct passwd *pw = getpwuid(getuid());
+    if (pw) {
+        RunUser = QString::fromLocal8Bit(pw->pw_name);
+    }
 
-    QString  RunUser = "";
-    QProcess Proc;
-    QObject::connect(&Proc, static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
-                     [&Proc, &RunUser]([[maybe_unused]] int exitCode, [[maybe_unused]] QProcess::ExitStatus exitStatus) {
-                         RunUser = QString::fromLocal8Bit(Proc.readAllStandardOutput());
-                         RunUser.replace("\n", "");
-                     });
-    Proc.start("whoami", QStringList({}));
-    Proc.waitForFinished();
+    if (RunUser.isEmpty()) std::cerr << QString("エラー : 実行ユーザ名の取得に失敗しました").toStdString() << std::endl;
 
-    // ランナー開始
+    // ランナーのインスタンス生成
     Runner runner(QCoreApplication::arguments(), RunUser);
-    QTimer::singleShot(0, &runner, &Runner::run);
-
 #elif Q_OS_WIN
+    // ランナーのインスタンス生成
+    Runner runner(QCoreApplication::arguments());
+#endif
 
     // ランナー開始
-    Runner runner(QCoreApplication::arguments());
     QTimer::singleShot(0, &runner, &Runner::run);
-
-#endif
 
     return app.exec();
 }

@@ -498,6 +498,113 @@ bool HtmlFetcher::getUrl(const xmlNodeSetPtr nodeset, int elementType)
 }
 
 
+// 共同通信の速報記事のURLにアクセスして、XPathで指定した本文を取得する
+int HtmlFetcher::fetchParagraphKyodoFlash(const QUrl &url, bool redirect, const QString &_xpath)
+{
+    m_Element.clear();
+
+    // リダイレクトを自動的にフォロー
+    QNetworkRequest request(url);
+
+    if (redirect) {
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, true);
+    }
+
+    auto pReply = m_pManager->get(request);
+
+    // レスポンス待機
+    QEventLoop loop;
+    QObject::connect(pReply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+
+    // レスポンスの取得
+    if (pReply->error() != QNetworkReply::NoError) {
+        std::cerr << QString("エラー : %1").arg(pReply->errorString()).toStdString() << std::endl;
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    QString htmlContent = pReply->readAll();
+
+    // libxml2の初期化
+    xmlInitParser();
+    LIBXML_TEST_VERSION
+
+    // 文字列からHTMLドキュメントをパース
+    // libxml2ではエンコーディングの自動判定において問題があるため、エンコーディングを明示的に指定する
+    xmlDocPtr doc = htmlReadDoc((const xmlChar*)htmlContent.toStdString().c_str(), nullptr, "UTF-8", HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+    if (doc == nullptr) {
+        std::cerr << QString("エラー : HTMLドキュメントのパースに失敗").toStdString() << std::endl;
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    // XPathコンテキストの生成
+    xmlXPathContextPtr context = xmlXPathNewContext(doc);
+    if (context == nullptr) {
+        std::cerr << "エラー : XPathコンテキストの生成に失敗" << std::endl;
+        xmlFreeDoc(doc);
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    // XPath評価
+    xmlXPathObjectPtr result = xmlXPathEvalExpression((const xmlChar*)_xpath.toUtf8().constData(), context);
+    if (result == nullptr) {
+        std::cerr << "エラー : XPath評価に失敗" << std::endl;
+        xmlXPathFreeContext(context);
+        xmlFreeDoc(doc);
+        pReply->deleteLater();
+
+        return -1;
+    }
+
+    // 結果のノードセットからテキストを取得
+    m_Element.clear();
+
+    xmlNodeSetPtr nodes = result->nodesetval;
+    if (nodes) {
+        for (int i = 0; i < nodes->nodeNr; i++) {
+            xmlNodePtr pNode = nodes->nodeTab[i];
+            QString paragraphText;
+
+            // pタグの全ての子ノードを処理
+            for (xmlNodePtr current = pNode->children; current; current = current->next) {
+                if (current->type == XML_TEXT_NODE) {
+                    if (current->content) {
+                        paragraphText += QString::fromUtf8((const char*)current->content);
+                    }
+                }
+                else if (current->type == XML_ELEMENT_NODE && xmlStrcmp(current->name, BAD_CAST "a") == 0) {
+                    xmlNodePtr textNode = current->children;
+                    if (textNode && textNode->content) {
+                        paragraphText += QString::fromUtf8((const char*)textNode->content);
+                    }
+                }
+            }
+
+            m_Element += paragraphText;
+            m_Element  = m_Element.trimmed();
+        }
+    }
+
+    // libxml2オブジェクトの破棄
+    xmlXPathFreeObject(result);
+    xmlXPathFreeContext(context);
+    xmlFreeDoc(doc);
+
+    // libxml2のクリーンアップ
+    xmlCleanupParser();
+
+    pReply->deleteLater();
+
+    return 0;
+}
+
+
 // 書き込むスレッドの最後尾のレス番号を取得する
 int HtmlFetcher::fetchLastThreadNum(const QUrl &url, bool redirect, const QString &_xpath, int elementType)
 {

@@ -12,12 +12,11 @@
 #include <QLockFile>
 #include <QException>
 #include <iostream>
-#include <random>
 #include <utility>
-#include <set>
 #include "Runner.h"
 #include "HtmlFetcher.h"
 #include "RandomGenerator.h"
+#include "CommandLineParser.h"
 
 
 #ifdef Q_OS_LINUX
@@ -47,58 +46,119 @@ void Runner::run()
     // コマンドラインオプションの確認
     // 設定ファイルおよびバージョン情報
     m_args.removeFirst();   // プログラムのパスを削除
-    for (auto &arg : m_args) {
-        if(arg.mid(0, 10) == "--sysconf=") {
-            // 設定ファイルのパス
-            auto option = arg;
-            option.replace("--sysconf=", "", Qt::CaseSensitive);
 
-            // 先頭と末尾にクォーテーションが存在する場合は取り除く
-            if ((option.startsWith('\"') && option.endsWith('\"')) || (option.startsWith('\'') && option.endsWith('\''))) {
-                option = option.mid(1, option.length() - 2);
-            }
+    CommandLineParser parser;
+    parser.setApplicationDescription("qNewsFlashは、時事ドットコムや共同通信等のニュース記事を取得して、0ch系の掲示板に書き込むソフトウェアです");
 
-            if (getConfiguration(option)) {
-                QCoreApplication::exit();
-                return;
-            }
-            else {
-                m_SysConfFile = option;
-            }
+    // --sysconf オプションを追加
+    QCommandLineOption sysconfOption(QStringList() << "sysconf",
+                                     "設定ファイル(.json)のパスを指定します",
+                                     "confFilePath");
+    parser.addOption(sysconfOption);
 
-            break;
+    // --version / -v オプションを追加
+    QCommandLineOption versionOption(QStringList() << "version" << "v", "バージョン情報を表示します");
+    parser.addOption(versionOption);
+
+    // --help / -h オプションを追加
+    QCommandLineOption helpOption(QStringList() << "help" << "h", "ヘルプ情報を表示します");
+    parser.addOption(helpOption);
+
+    // 未知のオプションを許可
+    parser.setOptionsAfterPositionalArgumentsMode(QCommandLineParser::ParseAsOptions);
+
+    // コマンドライン引数を解析
+    parser.process(QCoreApplication::arguments());
+
+    // 未知のオプションをチェック
+    if (!parser.unknownOptionNames().isEmpty()) {
+        std::cerr << QString("エラー : 不明なオプション %1").arg(parser.unknownOptionNames().join(", ")).toStdString() << std::endl;
+        QCoreApplication::exit();
+        return;
+    }
+
+    // 指定されたオプションの数をカウント
+    int     optionCount = 0;
+    QString specifiedOption;
+
+    if (parser.isVersionSet()) {
+        optionCount++;
+        specifiedOption = "version";
+    }
+
+    if (parser.isHelpSet()) {
+        optionCount++;
+        specifiedOption = "help";
+    }
+
+    if (parser.isSysConfSet()) {
+        optionCount++;
+        specifiedOption = "sysconf";
+    }
+
+    const QStringList unknownOptions = parser.unknownOptionNames();
+    if (!unknownOptions.isEmpty()) {
+        optionCount += unknownOptions.size();
+        specifiedOption = unknownOptions.first();
+    }
+
+    if (optionCount > 1) {
+        std::cerr << QString("エラー : 指定できるオプションは1つのみです").toStdString() << std::endl;
+        QCoreApplication::exit();
+        return;
+    }
+    else if (optionCount == 0) {
+        std::cerr << QString("エラー : オプションがありません").toStdString() << std::endl;
+        QCoreApplication::exit();
+        return;
+    }
+
+    if (parser.isSet(versionOption)) {
+        // --version / -vオプション
+        auto version = QString("qNewsFlash %1.%2.%3\n").arg(PROJECT_VERSION_MAJOR).arg(PROJECT_VERSION_MINOR).arg(PROJECT_VERSION_PATCH)
+                       + QString("ライセンス : UNLICENSE\n")
+                       + QString("ライセンスの詳細な情報は、<http://unlicense.org/> を参照してください\n\n")
+                       + QString("開発者 : Presire with ﾘ* ﾞㇷﾞ)ﾚ の みんな\n\n");
+        std::cout << version.toStdString() << std::endl;
+
+        QCoreApplication::exit();
+        return;
+    }
+    else if (parser.isSet(helpOption)) {
+        // --help / -h オプション
+        auto help = QString("使用法 : qNewsFlash [オプション]\n\n")
+                    + QString("\t--sysconf=<qNewsFlash.jsonファイルのパス>\t設定ファイルのパスを指定する\n")
+                    + QString("\t-v, --version\t\t\t\tバージョン情報を表示する\n\n");
+        std::cout << help.toStdString() << std::endl;
+
+        QCoreApplication::exit();
+        return;
+    }
+    else if (parser.isSet(sysconfOption)) {
+        // --sysconfオプションの値を取得
+        auto option = parser.value(sysconfOption);
+
+        // 先頭と末尾にクォーテーションが存在する場合は取り除く
+        if ((option.startsWith('\"') && option.endsWith('\"')) || (option.startsWith('\'') && option.endsWith('\''))) {
+            option = option.mid(1, option.length() - 2);
         }
-        else if (m_args.length() == 1 && (arg.compare("--version", Qt::CaseSensitive) == 0 || arg.compare("-v", Qt::CaseInsensitive) == 0) ) {
-            // バージョン情報
-            auto version = QString("qNewsFlash %1.%2.%3\n").arg(PROJECT_VERSION_MAJOR).arg(PROJECT_VERSION_MINOR).arg(PROJECT_VERSION_PATCH)
-                           + QString("ライセンス : UNLICENSE\n")
-                           + QString("ライセンスの詳細な情報は、<http://unlicense.org/> を参照してください\n\n")
-                           + QString("開発者 : presire with ﾘ* ﾞㇷﾞ)ﾚ の みんな\n\n");
-            std::cout << version.toStdString() << std::endl;
+
+        if (option.isEmpty()) {
+            std::cerr << QString("エラー : 設定ファイルのパスが不明です").toStdString() << std::endl;
 
             QCoreApplication::exit();
             return;
         }
-        else if (m_args.length() == 1 && (arg.compare("--help", Qt::CaseSensitive) == 0 || arg.compare("-h", Qt::CaseSensitive) == 0) ) {
-            // ヘルプ
-            auto help = QString("使用法 : qNewsFlash [オプション]\n\n")
-                           + QString("  --sysconf=<qNewsFlash.jsonファイルのパス>\t\t設定ファイルのパスを指定する\n")
-                           + QString("  -v, -V, --version                      \t\tバージョン情報を表示する\n\n");
-            std::cout << help.toStdString() << std::endl;
 
-            QCoreApplication::exit();
-            return;
-        }
-        else {
-            std::cerr << QString("エラー : 不明なオプションです - %1").arg(arg).toStdString() << std::endl;
+        m_SysConfFile = option;
 
+        if (getConfiguration(m_SysConfFile)) {
             QCoreApplication::exit();
             return;
         }
     }
-
-    if (m_SysConfFile.isEmpty()) {
-        std::cerr << QString("エラー : 設定ファイルのパスが不明です").toStdString() << std::endl;
+    else {
+        std::cerr << QString("エラー : 不明なオプションです - %1").arg(parser.isSet(specifiedOption)).toStdString() << std::endl;
 
         QCoreApplication::exit();
         return;
@@ -161,10 +221,16 @@ void Runner::run()
         connect(&m_timer, &QTimer::timeout, this, &Runner::fetchNonBreakingNews);
         m_timer.start(static_cast<int>(m_interval));
 
-        // 速報記事の自動取得タイマの開始
+        // (時事ドットコム) 速報記事の自動取得タイマの開始
         if (m_bJiJiFlash) {
             connect(&m_JiJiTimer, &QTimer::timeout, this, &Runner::JiJiFlashfetch);
             m_JiJiTimer.start(static_cast<int>(m_JiJiinterval));
+        }
+
+        // (共同通信) 速報記事の自動取得タイマの開始
+        if (m_bKyodoFlash) {
+            connect(&m_KyodoTimer, &QTimer::timeout, this, &Runner::KyodoFlashfetch);
+            m_KyodoTimer.start(static_cast<int>(m_Kyodointerval));
         }
 
         if (m_WriteInfo.BottomThread) {
@@ -181,6 +247,10 @@ void Runner::run()
     // 本ソフトウェア開始直後に時事ドットコムから速報記事を読み込む場合は、コメントを解除して、JiJiFlashfetch()メソッドを実行する
     // コメントアウトしている場合、かつ、通常実行またはSystemdサービスで実行する場合、最初に速報記事を読み込むタイミングは、タイマの指定時間後となる
     JiJiFlashfetch();
+
+    // 本ソフトウェア開始直後に共同通信から速報記事を読み込む場合は、コメントを解除して、KyodoFlashfetch()メソッドを実行する
+    // コメントアウトしている場合、かつ、通常実行またはSystemdサービスで実行する場合、最初に速報記事を読み込むタイミングは、タイマの指定時間後となる
+    KyodoFlashfetch();
 
     // ソフトウェアの自動起動が無効の場合
     // Cronを使用する場合、または、ワンショットで動作させる場合の処理
@@ -445,7 +515,7 @@ void Runner::fetchNonBreakingNews()
 
         // ニュース記事の書き込み
         if (m_WriteMode == 1) {
-            // 書き込みモード 1 : 1つのスレッドにニュース記事および時事ドットコムの速報ニュースを書き込むモード
+            // 書き込みモード 1 : 1つのスレッドにニュース記事および速報ニュースを書き込むモード
             auto iRet = m_pWriteMode->writeMode1();
             if (iRet == WriteMode::WRITEERROR::POSTERROR) {
                 return;
@@ -456,8 +526,8 @@ void Runner::fetchNonBreakingNews()
             }
         }
         else if (m_WriteMode == 2 || m_WriteMode == 3) {
-            // 書き込みモード 2 : ニュース記事および時事ドットコムの速報ニュースにおいて、常に新規スレッドを立てるモード
-            // 書き込みモード 3 : 時事ドットコムの速報ニュース以外は、常に新規スレッドを立てるモード
+            // 書き込みモード 2 : ニュース記事および速報ニュースにおいて、常に新規スレッドを立てるモード
+            // 書き込みモード 3 : 速報ニュース以外は、常に新規スレッドを立てるモード
             auto iRet = m_pWriteMode->writeMode2();
             if (iRet == WriteMode::WRITEERROR::POSTERROR) {
                 return;
@@ -1581,7 +1651,7 @@ void Runner::JiJiFlashfetch()
 
     // ニュース記事の書き込み
     if (m_WriteMode == 1 || m_WriteMode == 3) {
-        // 書き込みモード 1, 3 : 1つのスレッドにニュース記事および時事ドットコムの速報ニュースを書き込むモード
+        // 書き込みモード 1, 3 : 1つのスレッドにニュース記事および速報ニュースを書き込むモード
         auto iRet = m_pWriteMode->writeMode1();
         if (iRet == WriteMode::WRITEERROR::POSTERROR) {
             return;
@@ -1592,7 +1662,158 @@ void Runner::JiJiFlashfetch()
         }
     }
     else if (m_WriteMode == 2) {
-        // 書き込みモード 2 : ニュース記事および時事ドットコムの速報ニュースにおいて、常に新規スレッドを立てるモード
+        // 書き込みモード 2 : ニュース記事および速報ニュースにおいて、常に新規スレッドを立てるモード
+        auto iRet = m_pWriteMode->writeMode2();
+        if (iRet == WriteMode::WRITEERROR::POSTERROR) {
+            return;
+        }
+        else if (iRet == WriteMode::WRITEERROR::LOGERROR) {
+            QCoreApplication::exit();
+            return;
+        }
+    }
+    else {
+        std::cerr << QString("エラー : 不明な書き込みモード \"%1\"").arg(m_WriteMode).toStdString() << std::endl;
+        QCoreApplication::exit();
+        return;
+    }
+
+    // ニュース記事を書き込むスレッドの情報を更新
+    m_ThreadInfo = m_pWriteMode->getThreadInfo();
+
+    // スレッドの書き込みに関する情報を更新
+    m_WriteInfo  = m_pWriteMode->getWriteInfo();
+
+    // 書き込み済みの記事を履歴として登録 (同じ記事を1日に2回以上書き込まないようにする)
+    // ただし、2日前以上の書き込み済み記事の履歴は削除する
+    Article article(title, paragraph, link, pubDate);
+    m_WrittenArticles.append(article);
+
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
+    if (m_stopRequested.load()) return;
+
+    return;
+}
+
+
+void Runner::KyodoFlashfetch()
+{
+    // 時事ドットコムの速報記事を取得するかどうかを確認
+    if (!m_bKyodoFlash) {
+        return;
+    }
+
+    // 現在の日時を取得して日付が変わっているかどうかを確認
+    /// 日本のタイムゾーンを設定
+    auto now = QDateTime::currentDateTimeUtc().toTimeZone(QTimeZone("Asia/Tokyo"));
+
+    /// 現在の年月日のみを取得
+    auto currentDate = now.date();
+    auto date = QString("%1/%2/%3").arg(currentDate.year()).arg(currentDate.month()).arg(currentDate.day());
+
+    /// 前回のニュース記事を取得した日付と比較
+    if (m_LastUpdate.compare(date, Qt::CaseSensitive) != 0) {
+        /// 日付が変わっている場合
+        m_LastUpdate = date;
+
+        /// メンバ変数m_WrittenArticlesから、書き込み済みの2日以上前の記事群を削除
+        m_WrittenArticles.clear();
+
+        /// ログファイルから、2日以上前の書き込み済みニュース記事を削除
+        if (m_pWriteMode->deleteLogNotToday()) {
+            QCoreApplication::exit();
+            return;
+        }
+
+        /// ログファイルから、今日と昨日の書き込み済みのニュース記事を取得
+        /// また、取得した記事群のデータはメンバ変数m_WrittenArticlesに格納
+        try {
+            m_WrittenArticles = m_pWriteMode->getDatafromWrittenLog();
+        }
+        catch (const std::runtime_error &e) {
+            // ログファイルのオープンや読み込みに失敗した場合
+            std::cerr << QString("%1").arg(e.what()).toStdString();
+
+            QCoreApplication::exit();
+            return;
+        }
+        catch (const std::exception &e) {
+            // その他の例外をキャッチ
+            std::cerr << QString("%1").arg(e.what()).toStdString();
+
+            QCoreApplication::exit();
+            return;
+        }
+    }
+
+    // 設定ファイルの"update"キーを更新
+    if (m_pWriteMode->updateDateJson(m_LastUpdate)) {
+        QCoreApplication::exit();
+        return;
+    }
+
+    // 前回取得した書き込み前の記事群(選定前)を初期化
+    m_BeforeWritingArticles.clear();
+
+    if (m_stopRequested.load()) return;
+
+    // 共同通信から速報記事の取得
+    KyodoFlash kyodoFlash(m_MaxParagraph, m_KyodoFlashInfo, this);
+    if (kyodoFlash.FetchFlash()) {
+        return;
+    }
+
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
+    if (m_stopRequested.load()) return;
+
+    auto [title, paragraph, link, pubDate] = kyodoFlash.getArticleData();
+
+    // 速報記事の公開日を確認
+    // 今日の速報記事ではない場合は無視
+    // (現在は使用しない)
+    // auto isCheckDate = isToday(pubDate);
+    // if (!isCheckDate) {
+    //     return;
+    // }
+
+    // 既に書き込み済みの速報記事の場合は無視
+    for (auto &writtenArticle : m_WrittenArticles) {
+        QString url = "";
+        std::tie(std::ignore, std::ignore, url, std::ignore) = writtenArticle.getArticleData();
+
+        if (url.compare(link, Qt::CaseSensitive) == 0) {
+            // 既に書き込み済みの記事の場合
+            return;
+        }
+    }
+
+#ifdef _DEBUG
+    qDebug() << "書き込む速報記事";
+    qDebug() << "Title : " << title;
+    qDebug() << "URL : " << link;
+    qDebug() << "Date : " << pubDate;
+    qDebug() << "";
+#endif
+
+    // 書き込みモードの設定
+    m_pWriteMode->setArticle(title, "", link, pubDate);     // 書き込むニュース記事を指定
+    m_pWriteMode->setThreadInfo(m_ThreadInfo);              // スレッド情報に関する設定を指定
+    m_pWriteMode->setWriteInfo(m_WriteInfo);                // 書き込み情報に関する設定を指定
+
+    // ニュース記事の書き込み
+    if (m_WriteMode == 1 || m_WriteMode == 3) {
+        // 書き込みモード 1, 3 : 1つのスレッドにニュース記事および速報ニュースを書き込むモード
+        auto iRet = m_pWriteMode->writeMode1();
+        if (iRet == WriteMode::WRITEERROR::POSTERROR) {
+            return;
+        }
+        else if (iRet == WriteMode::WRITEERROR::LOGERROR) {
+            QCoreApplication::exit();
+            return;
+        }
+    }
+    else if (m_WriteMode == 2) {
+        // 書き込みモード 2 : ニュース記事および速報ニュースにおいて、常に新規スレッドを立てるモード
         auto iRet = m_pWriteMode->writeMode2();
         if (iRet == WriteMode::WRITEERROR::POSTERROR) {
             return;
@@ -1991,6 +2212,57 @@ int Runner::getConfiguration(QString &filepath)
         m_KyodoNewsOnly     = KyodoObject["newsonly"].toBool(true);   /// 共同通信から取得するニュース記事の種類をニュースのみに絞るかどうか
                                                                       /// ニュース以外の記事では、ビジネス関連やライフスタイル等の記事がある
 
+        // 共同通信の速報ニュース記事
+        auto kyodoFlashObject  = JsonObject["kyodoflash"].toObject();     /// 共同通信の速報ニュースオブジェクトの取得
+        m_bKyodoFlash          = kyodoFlashObject["enable"].toBool(false);  /// 共同通信の速報ニュースの有効 / 無効
+        if (m_bKyodoFlash) {
+            /// 共同通信の速報ニュースを取得する時間間隔 (未指定の場合、インターバルは10[分])
+            /// ただし、1分未満には設定できない (1分未満に設定した場合は、1分に設定する)
+            auto kyodoInterval = kyodoFlashObject["interval"].toString("600");
+            bool ok;
+            m_Kyodointerval = kyodoInterval.toULongLong(&ok);
+            if (!ok) {
+                std::cerr << QString("警告 : 設定ファイルのkyodoflash:intervalキーの値が不正です").toStdString() << std::endl;
+                std::cerr << QString("更新時間の間隔は、自動的に10分に設定されます").toStdString() << std::endl;
+
+                m_Kyodointerval = 10 * 60 * 1000;
+            }
+            else {
+                if (m_Kyodointerval == 0) {
+                    std::cerr << "インターバルの値が未指定もしくは0のため、10[分]に設定されます" << std::endl;
+                    m_Kyodointerval = 10 * 60 * 1000;
+                }
+                else if (m_Kyodointerval < (1 * 60)) {
+                    std::cerr << "インターバルの値が1[分]未満のため、1[分]に設定されます" << std::endl;
+                    m_Kyodointerval = 1 * 60 * 1000;
+                }
+                else if (m_Kyodointerval < 0) {
+                    throw std::runtime_error("インターバルの値が不正です");
+                }
+                else {
+                    m_Kyodointerval *= 1000;
+                }
+            }
+
+            /// 共同通信の速報記事の基準となるURL
+            m_KyodoFlashInfo.BasisURL    = kyodoFlashObject["basisurl"].toString("");
+
+            /// 共同通信の速報記事の一覧が存在するURL
+            m_KyodoFlashInfo.FlashUrl     = kyodoFlashObject["flashurl"].toString("");
+
+            /// 共同通信の速報記事が記載されているURLから速報記事のリンクを取得するXPath
+            m_KyodoFlashInfo.FlashXPath   = kyodoFlashObject["flashxpath"].toString("");
+
+            /// 共同通信の各速報記事のURLから記事のタイトルを取得するXPath
+            m_KyodoFlashInfo.TitleXPath   = kyodoFlashObject["titlexpath"].toString("");
+
+            /// 共同通信の各速報記事のURLから記事の本文を取得するXPath
+            m_KyodoFlashInfo.ParaXPath    = kyodoFlashObject["paraxpath"].toString("");
+
+            /// 共同通信の各速報記事のURLから記事の公開日を取得するXPath
+            m_KyodoFlashInfo.PubDateXPath = kyodoFlashObject["pubdatexpath"].toString("");
+        }
+
         // 朝日新聞デジタルのニュース記事
         auto AsahiObject    = JsonObject["asahi"].toObject();         /// 朝日新聞デジタルのニュースオブジェクトの取得
         m_bAsahi            = AsahiObject["enable"].toBool(false);    /// 朝日新聞デジタルの有効 / 無効
@@ -2114,7 +2386,7 @@ int Runner::getConfiguration(QString &filepath)
         /// 書き込みモード
         /// 書き込みモード 1 : 1つのスレッドにニュース記事を書き込むモード
         /// 書き込みモード 2 : ニュース記事ごとに新規スレッドを立てるモード
-        /// 書き込みモード 3 : 時事ドットコムの速報記事は1つのスレッドに書き込み、それ以外のニュース記事はニュース記事ごとに新規スレッドを立てるモード
+        /// 書き込みモード 3 : 速報記事は1つのスレッドに書き込み、それ以外のニュース記事はニュース記事ごとに新規スレッドを立てるモード
         auto WriteMode  = threadObject["writemode"].toInt(1);
         switch (WriteMode) {
             case 1:
@@ -2135,11 +2407,11 @@ int Runner::getConfiguration(QString &filepath)
         }
 
         /// 書き込むスレッドのURL
-        /// 設定ファイル内のスレッドのURLは、書き込みモード 1 および 書き込みモード 3の時事ドットコムの速報ニュースのみで使用
+        /// 設定ファイル内のスレッドのURLは、書き込みモード 1 および 書き込みモード 3の速報ニュースのみで使用
         m_WriteInfo.ThreadURL        = threadObject["threadurl"].toString("");
         if (m_WriteInfo.ThreadURL.isEmpty()) {
-            if      (WriteMode == 1)                 std::cout << QString("スレッドのURLが空欄のため、専用スレッドを新規作成します").toStdString() << std::endl;
-            else if (WriteMode == 3 && m_bJiJiFlash) std::cout << QString("スレッドのURLが空欄のため、時事ドットコムの速報ニュースは専用スレッドを新規作成します").toStdString() << std::endl;
+            if      (WriteMode == 1)                                    std::cout << QString("スレッドのURLが空欄のため、専用スレッドを新規作成します").toStdString() << std::endl;
+            else if (WriteMode == 3 && (m_bJiJiFlash || m_bKyodoFlash)) std::cout << QString("スレッドのURLが空欄のため、速報ニュースは専用スレッドを新規作成します").toStdString() << std::endl;
         }
 
         /// 書き込み済みのスレッドのタイトル
@@ -2175,7 +2447,7 @@ int Runner::getConfiguration(QString &filepath)
         m_ThreadInfo.from       = threadObject["from"].toString("");      // 名前欄
         m_ThreadInfo.mail       = threadObject["mail"].toString("");      // メール欄
         m_ThreadInfo.bbs        = threadObject["bbs"].toString("");       // BBS名
-        m_ThreadInfo.key        = threadObject["key"].toString("");       // スレッド番号 (書き込みモード 1 および 書き込みモード 3の時事ドットコムの速報ニュースのみで使用)
+        m_ThreadInfo.key        = threadObject["key"].toString("");       // スレッド番号 (書き込みモード 1 および 書き込みモード 3の速報ニュースのみで使用)
         m_ThreadInfo.shiftjis   = threadObject["shiftjis"].toBool(true);  // Shift-JISの有効 / 無効
 
         // Webページから一意のタグの値を取得

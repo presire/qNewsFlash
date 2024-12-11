@@ -35,6 +35,16 @@
         "newsonly": true,
         "rss": "https://www.kyodo.co.jp/news/feed/"
     },
+    "kyodoflash": {
+        "basisurl": "https://www.47news.jp",
+        "enable": true,
+        "flashurl": "https://www.47news.jp/bulletin",
+        "flashxpath": "/html/body/div[@id='__next']/div/div[@id='wrapper']/main/div[@class='page_layout layout_pc_mt2']/div[@class='container']/div[@class='content_width']/div[@class='row is_row_type_main_side']/div[@class='col_main main_body']/div[@class='main_row2']/div[@class='post_items post_items_pc_mb1']/a[1]/@href",
+        "interval": "600",
+        "paraxpath": "/html/body/div[@id='__next']/div/div[@id='wrapper']/main/div[@class='page_layout layout_pc_mt2']/div[@class='container']/div[@class='content_width']/div[@class='row is_row_type_main_side']/div[@class='col_main main_body']/div[@class='post_items']/div[@id='detail_area']/div[@class='item_body']/p",
+        "pubdatexpath": "/html/body/div[@id='__next']/div/div[@id='wrapper']/main/div[@class='page_layout layout_pc_mt2']/div[@class='container']/div[@class='content_width']/div[@class='row is_row_type_main_side']/div[@class='col_main main_body']/div[@class='post_items']/div[@id='detail_area']/div[@class='item_time']",
+        "titlexpath": "/html/head/meta[@property='og:title']/@content"
+    },
     "logfile": "/var/log/qNewsFlash_log.json",
     "maxpara": "100",
     "newsapi": {
@@ -62,6 +72,7 @@
         "expiredelement": "指定されたスレッドは存在しません",
         "expiredxpath": "/html/head/title",
         "from": "",
+        "ishogo": false,
         "key": "",
         "mail": "",
         "max": 1000,

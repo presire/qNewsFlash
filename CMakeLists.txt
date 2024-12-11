@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(qNewsFlash VERSION 0.4.0 LANGUAGES CXX)
+project(qNewsFlash VERSION 1.0.0 LANGUAGES C CXX)
 
 
 # Linuxのみビルドを許可
@@ -90,7 +90,10 @@ add_executable(qNewsFlash
         RandomGenerator.h RandomGenerator.cpp
         Poster.h Poster.cpp
         JiJiFlash.h JiJiFlash.cpp
+        KyodoFlash.h KyodoFlash.cpp
         WriteMode.h WriteMode.cpp
+        CommandLineParser.h CommandLineParser.cpp
+
 )
 
 

@@ -1,29 +1,31 @@
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <iostream>
-#include "JiJiFlash.h"
+#include "KyodoFlash.h"
 #include "HtmlFetcher.h"
 
 
-JiJiFlash::JiJiFlash(long long maxPara, JIJIFLASHINFO Info, QObject *parent) : m_MaxParagraph(maxPara), m_FlashInfo(Info), QObject{parent}
+KyodoFlash::KyodoFlash(long long maxPara, KYODOFLASHINFO Info, QObject *parent) :
+    m_MaxParagraph(maxPara), m_FlashInfo(Info), QObject{parent}
 {
+
 }
 
 
-JiJiFlash::~JiJiFlash() = default;
+KyodoFlash::~KyodoFlash() = default;
 
 
-int JiJiFlash::FetchFlash()
+int KyodoFlash::FetchFlash()
 {
     HtmlFetcher fetcher(this);
 
     // 速報記事の一覧が記載されているURLにアクセスして速報記事のURLを取得
     if (fetcher.fetchElement(m_FlashInfo.FlashUrl, true, m_FlashInfo.FlashXPath, XML_TEXT_NODE)) {
-        std::cerr << QString("エラー : (時事ドットコム) 速報記事の取得に失敗").toStdString() << std::endl;
+        std::cerr << QString("エラー : (共同通信) 速報記事の取得に失敗").toStdString() << std::endl;
         return -1;
     }
 
-    /// 速報記事のURLを取得
+    /// 速報記事のURLを取得 (/xxxx.html形式)
     auto articleLink = fetcher.GetElement();
 
     /// 末尾の半角スペースを削除
@@ -34,7 +36,7 @@ int JiJiFlash::FetchFlash()
 
     // 速報記事のURLにアクセスして速報記事のタイトル名を取得
     if (fetcher.fetchElement(link, true, m_FlashInfo.TitleXPath, XML_TEXT_NODE)) {
-        std::cerr << QString("エラー : (時事ドットコム) 速報記事のタイトルの取得に失敗").toStdString() << std::endl;
+        std::cerr << QString("エラー : (共同通信) 速報記事のタイトルの取得に失敗").toStdString() << std::endl;
         return -1;
     }
 
@@ -45,8 +47,8 @@ int JiJiFlash::FetchFlash()
     if (title.endsWith(" ")) title.chop(1);
 
     // 速報記事のURLにアクセスして速報記事の本文を取得
-    if (fetcher.fetchElement(link, true, m_FlashInfo.ParaXPath, XML_TEXT_NODE)) {
-        std::cerr << QString("エラー : (時事ドットコム) 速報記事の本文の取得に失敗").toStdString() << std::endl;
+    if (fetcher.fetchParagraphKyodoFlash(link, true, m_FlashInfo.ParaXPath)) {
+        std::cerr << QString("エラー : (共同通信) 速報記事の本文の取得に失敗").toStdString() << std::endl;
         return -1;
     }
 
@@ -61,36 +63,22 @@ int JiJiFlash::FetchFlash()
 
     // 速報記事のURLにアクセスして速報記事の公開日を取得
     if (fetcher.fetchElement(link, true, m_FlashInfo.PubDateXPath, XML_TEXT_NODE)) {
-        std::cerr << QString("エラー : (時事ドットコム) 速報記事の公開日の取得に失敗").toStdString() << std::endl;
+        std::cerr << QString("エラー : (共同通信) 速報記事の公開日の取得に失敗").toStdString() << std::endl;
         return -1;
     }
 
     /// 速報記事の本文を取得
     auto date = fetcher.GetElement();
+    if (date.isEmpty()) {
+        std::cerr << QString("エラー : (共同通信) 速報記事の公開日の取得に失敗").toStdString() << std::endl;
+        return -1;
+    }
 
     /// 末尾の半角スペースを削除
     if (date.endsWith(" ")) date.chop(1);
 
-    /// 日付をISO8601形式から"yyyy年M月d日 H時m分"に変換
+    /// 共同通信の日付形式を"yyyy年M月d日 H時m分"に変換
     date = convertDate(date);
-
-    // (現在、version 0.3.2では未使用としている)
-    // 速報記事のURLにアクセスして"<この速報の記事を読む>"の部分のリンクを取得
-    // このリンクが存在しない場合は速報記事とする
-    // このリンクが存在する場合は、既に本記事があるため速報記事と看做さない
-    // if (fetcher.fetchElementJiJiFlashUrl(link, true, m_FlashInfo.UrlXPath, XML_ELEMENT_NODE)) {
-    //    // 既に本記事が存在する場合、または、読み込みエラーの場合
-    //    return -1;
-    // }
-
-    // /// 速報記事の"<この速報の記事を読む>"の部分のリンクを取得
-    // auto origLink = fetcher.GetElement();
-
-    // /// リンクが存在するかどうかを確認
-    // if (!origLink.isEmpty()) {
-    //    /// リンクが存在する場合
-    //    return -1;
-    // }
 
     m_Title     = title;
     m_Paragraph = paragraph;
@@ -101,17 +89,18 @@ int JiJiFlash::FetchFlash()
 }
 
 
-// 日付をISO8601形式から"yyyy年M月d日 H時m分"に変換
-QString JiJiFlash::convertDate(QString &strDate)
+// 共同通信の日付形式を"yyyy年M月d日 H時m分"に変換
+QString KyodoFlash::convertDate(QString &strDate)
 {
-    // ISO 8601形式 (YYYY-MM-DDTHH:mm:SS+XX:XX) の日時列を解析
-    auto dateTime = QDateTime::fromString(strDate, Qt::ISODate);
+    // 共同通信の日時列を解析
+    auto dateTime = QDateTime::fromString(strDate, "yyyy年MM月dd日 HH時mm分");
     QString convertDate = "";
 
     if (!dateTime.isValid()) {
-        std::cerr << QString("(時事ドットコム) 日付の変換に失敗 : %1").arg(strDate).toStdString();
+        std::cerr << QString("日付の変換に失敗: %1").arg(strDate).toStdString();
     }
     else {
+        // "yyyy年M月d日 H時m分" 形式に変換
         convertDate = dateTime.toString("yyyy年M月d日 H時m分");
     }
 
@@ -120,7 +109,7 @@ QString JiJiFlash::convertDate(QString &strDate)
 
 
 // フォーマットに合わせた速報記事を取得する
-std::tuple<QString, QString, QString, QString> JiJiFlash::getArticleData() const
+std::tuple<QString, QString, QString, QString> KyodoFlash::getArticleData() const
 {
     return std::make_tuple(m_Title, m_Paragraph, m_URL, m_Date);
 }
