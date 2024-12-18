@@ -46,6 +46,11 @@
         "titlexpath": "/html/head/meta[@property='og:title']/@content"
     },
     "logfile": "/var/log/qNewsFlash_log.json",
+    "mainichi": {
+        "enable": true,
+        "paraxpath": "/html/head/meta[@name='description']/@content",
+        "rss": "https://mainichi.jp/rss/etc/mainichi-flash.rss"
+    },
     "maxpara": "100",
     "newsapi": {
         "api": "",

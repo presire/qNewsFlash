@@ -87,6 +87,13 @@ private:  // Variables
     bool                                    m_bAsahi;           // 朝日新聞デジタルからニュース記事を取得するかどうか
     QString                                 m_AsahiRSS;         // 朝日新聞デジタルからニュース記事を取得するためのRSS (URL)
 
+    // 毎日新聞 (ニュースサイト)
+    bool                                    m_bMainichi;         // 毎日新聞からニュース記事を取得するかどうか
+    QString                                 m_MainichiRSS;       // 毎日新聞からニュース記事の概要を取得するためのRSS (URL)
+    QString                                 m_MainichiParaXPath; // 毎日新聞からニュース記事の概要を取得するためのXPath式
+                                                                 // RSSにあるニュース記事の本文の値が空欄のため、
+                                                                 // 該当するニュース記事のURLから記事の本文のみを抽出している
+
     // CNET Japan (ニュースサイト)
     bool                                    m_bCNet;            // CNET Japanからニュース記事を取得するかどうか
     QString                                 m_CNETRSS;          // CNET Japanからニュース記事を取得するためのRSS (URL)
@@ -125,6 +132,7 @@ private:  // Variables
     QNetworkReply                           *m_pReplyJiJi;      // 時事ドットコム用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyKyodo;     // 共同通信用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyAsahi;     // 朝日新聞デジタル用HTTPレスポンスのオブジェクト
+    QNetworkReply                           *m_pReplyMainichi;  // 毎日新聞用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyCNet;      // CNET用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyHanJ;      // ハンギョレジャパン用HTTPレスポンスのオブジェクト
     QNetworkReply                           *m_pReplyReuters;   // ロイター通信用HTTPレスポンスのオブジェクト
@@ -170,15 +178,16 @@ private:  // Methods
     void           itemTagsforJiJi(xmlNode *a_node);            // 時事ドットコムのニュース記事(RSS)を分解して取得
     void           itemTagsforKyodo(xmlNode *a_node);           // 共同通信のニュース記事(RSS)を分解して取得
     void           itemTagsforAsahi(xmlNode *a_node);           // 朝日新聞デジタルのニュース記事(RSS)を分解して取得
+    void           itemTagsforMainichi(xmlNode *a_node);        // 毎日新聞のニュース記事(RSS)を分解して取得
     void           itemTagsforCNet(xmlNode *a_node);            // CNET Japanのニュース記事(RSS)を分解して取得
     void           itemTagsforHanJ(xmlNode *a_node);            // ハンギョレジャパンのニュース記事(RSS)を分解して取得
     void           itemTagsforReuters(xmlNode *a_node);         // ロイター通信のニュース記事(RSS)を分解して取得
-    static QString convertJPDate(QString &strDate);             // News APIのニュース記事にある日付を日本時間および"yyyy/M/d h時m分"に変換
+    static QString convertJPDate(QString &strDate);             // UTC時刻から日本時間および"yyyy/M/d h時m分"に変換 (News API等で使用)
     static QString convertJPDateforKyodo(QString &strDate);     // 共同通信のニュース記事にある日付を日本時間および"yyyy/M/d h時m分"に変換
-    static QString convertDate(QString &strDate);               // 時事ドットコム、ロイター通信のニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
-    static QString convertDateHanJ(QString &strDate);           // ハンギョレジャパンのニュース記事にある日付を"yyyy年M月d日 H時m分"に変換
+    static QString convertDate(QString &strDate);               // ISO8601形式の時刻を"yyyy年M月d日 H時m分"に変換 (時事ドットコム、ロイター通信等で使用)
+    static QString convertDateHanJ(QString &strDate);           // RFC 2822形式の時刻を"yyyy年M月d日 H時m分"に変換 (ハンギョレジャパン等で使用)
     static bool    isToday(const QString &dateString);          // ニュース記事が今日の日付かどうかを確認
-    bool           isHoursAgo(const QString &dateString) const; // ニュース記事が数時間前の日付かどうかを確認
+    bool           isHoursAgo(const QString &dateString) const; // ニュース記事が指定時間以内の時刻かどうかを確認
     Article        selectArticle();                             // 取得したニュース記事群からランダムで1つを選択
 
 public:  // Methods
@@ -196,6 +205,7 @@ signals:
     void JiJifinished();        // 時事ドットコムからニュース記事の取得の終了を知らせるためのシグナル
     void Kyodofinished();       // 共同通信からニュース記事の取得の終了を知らせるためのシグナル
     void Asahifinished();       // 朝日新聞デジタルからニュース記事の取得の終了を知らせるためのシグナル
+    void Mainichifinished();    // 毎日新聞からニュース記事の取得の終了を知らせるためのシグナル
     void CNetfinished();        // CNET Japanからニュース記事の取得の終了を知らせるためのシグナル
     void HanJfinished();        // ハンギョレジャパンからニュース記事の取得の終了を知らせるためのシグナル
     void Reutersfinished();     // ロイター通信からニュース記事の取得の終了を知らせるためのシグナル
@@ -208,6 +218,7 @@ public slots:
     void fetchJiJiRSS();            // 時事ドットコムからニュース記事の取得後に実行するスロット
     void fetchKyodoRSS();           // 共同通信からニュース記事の取得後に実行するスロット
     void fetchAsahiRSS();           // 朝日新聞デジタルからニュース記事の取得後に実行するスロット
+    void fetchMainichiRSS();        // 毎日新聞からニュース記事の取得後に実行するスロット
     void fetchCNetRSS();            // CNET Japanからニュース記事の取得後に実行するスロット
     void fetchHanJRSS();            // ハンギョレジャパンからニュース記事の取得後に実行するスロット
     void fetchReutersRSS();         // ロイター通信からニュース記事の取得後に実行するスロット

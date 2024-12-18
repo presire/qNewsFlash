@@ -126,7 +126,7 @@ int HtmlFetcher::checkUrlExistence(const QUrl &url, const QString ExpiredElement
     if (pReply->error() == QNetworkReply::NoError) {
         QString encodedData = "";
         if (shiftjis) {
-            /// Shift-JISからUTF-8へエンコード
+            /// Shift-JISからUTF-8へデコード
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
             QStringDecoder decoder("Shift-JIS");
             encodedData = decoder(pReply->readAll());
@@ -563,8 +563,6 @@ int HtmlFetcher::fetchParagraphKyodoFlash(const QUrl &url, bool redirect, const 
     }
 
     // 結果のノードセットからテキストを取得
-    m_Element.clear();
-
     xmlNodeSetPtr nodes = result->nodesetval;
     if (nodes) {
         for (int i = 0; i < nodes->nodeNr; i++) {

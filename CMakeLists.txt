@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(qNewsFlash VERSION 1.0.0 LANGUAGES C CXX)
+project(qNewsFlash VERSION 1.1.0 LANGUAGES C CXX)
 
 
 # Linuxのみビルドを許可
@@ -39,25 +39,70 @@ set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Installation directory")
 find_package(PkgConfig REQUIRED)
 
 
-# WITH_LIBXML2オプションに"libxml-2.0.pc"ファイルのパスを指定する場合、任意のディレクトリに存在するlibxml2.0ライブラリを使用する
+# libxml2ライブラリの設定
+## WITH_LIBXML2オプションに"libxml-2.0.pc"ファイルのパスを指定する場合、任意のディレクトリに存在するlibxml2.0ライブラリを使用する
 set(WITH_LIBXML2 "" CACHE STRING "Path to libxml-2.0.pc file")
 
-# WITH_LIBXML2が空ではない場合、その値を環境変数PKG_CONFIG_PATHに追加
+## WITH_LIBXML2が空ではない場合、その値を環境変数PKG_CONFIG_PATHに追加
 if(NOT WITH_LIBXML2 STREQUAL "")
     set(ENV{PKG_CONFIG_PATH} "${WITH_LIBXML2}:$ENV{PKG_CONFIG_PATH}")
 endif()
 
 
-# pkg-configを使用してlibxml2ライブラリを検索
+## pkg-configを使用してlibxml2ライブラリを検索
 pkg_search_module(LIBXML2 REQUIRED libxml-2.0)
 
 
-# ライブラリのインクルードディレクトリをターゲットに追加
+## ライブラリのインクルードディレクトリをターゲットに追加
 include_directories(${LIBXML2_INCLUDE_DIRS})
 
 
-# ライブラリのリンクディレクトリをターゲットに追加
+## ライブラリのリンクディレクトリをターゲットに追加
 link_directories(${LIBXML2_LIBRARY_DIRS})
+
+
+# OpenSSL3の設定
+## WITH_OPENSSL3オプションにOpenSSL3のインストールディレクトリを指定
+set(WITH_OPENSSL3 "" CACHE PATH "Path to OpenSSL3 installation directory")
+
+## WITH_OPENSSL3が空ではない場合、環境変数を設定
+if(NOT WITH_OPENSSL3 STREQUAL "")
+    set(OPENSSL_ROOT_DIR "${WITH_OPENSSL3}")
+
+    ## PATHにbinディレクトリを追加
+    set(ENV{PATH} "${WITH_OPENSSL3}/bin:$ENV{PATH}")
+
+    ## libディレクトリの存在確認
+    if(EXISTS "${WITH_OPENSSL3}/lib64")
+        set(OPENSSL3_LIB_DIR "lib64")
+    else()
+        set(OPENSSL3_LIB_DIR "lib")
+    endif()
+
+    ## LD_LIBRARY_PATHにlib / lib64を追加
+    set(ENV{LD_LIBRARY_PATH} "${WITH_OPENSSL3}/${OPENSSL3_LIB_DIR}:$ENV{LD_LIBRARY_PATH}")
+
+    ## PKG_CONFIG_PATHにlib / lib64/pkgconfigを追加
+    set(ENV{PKG_CONFIG_PATH} "${WITH_OPENSSL3}/${OPENSSL3_LIB_DIR}/pkgconfig:$ENV{PKG_CONFIG_PATH}")
+
+    ## OPENSSL_CONFに/ssl/openssl.cnfを追加
+    set(ENV{OPENSSL_CONF} "${WITH_OPENSSL3}/ssl/openssl.cnf")
+
+    ## pkg-configを使用してOpenSSL3を検索
+    pkg_search_module(OPENSSL3 REQUIRED libssl libcrypto)
+
+    if(OPENSSL3_FOUND)
+        message("OpenSSL 3 is Found.")
+
+        ## ライブラリのインクルードディレクトリをターゲットに追加
+        include_directories(${OPENSSL3_INCLUDE_DIRS})
+
+        ## ライブラリのリンクディレクトリをターゲットに追加
+        link_directories(${OPENSSL3_LIBRARY_DIRS})
+    endif()
+else()
+    find_package(OpenSSL REQUIRED)
+endif()
 
 
 # pkg-configを使用してQtライブラリを検索
@@ -84,16 +129,15 @@ endif()
 
 add_executable(qNewsFlash
         main.cpp
-        Runner.h Runner.cpp
-        HtmlFetcher.h HtmlFetcher.cpp
-        Article.h Article.cpp
-        RandomGenerator.h RandomGenerator.cpp
-        Poster.h Poster.cpp
-        JiJiFlash.h JiJiFlash.cpp
-        KyodoFlash.h KyodoFlash.cpp
-        WriteMode.h WriteMode.cpp
+        Runner.h            Runner.cpp
+        HtmlFetcher.h       HtmlFetcher.cpp
+        Article.h           Article.cpp
+        RandomGenerator.h   RandomGenerator.cpp
+        Poster.h            Poster.cpp
+        JiJiFlash.h         JiJiFlash.cpp
+        KyodoFlash.h        KyodoFlash.cpp
+        WriteMode.h         WriteMode.cpp
         CommandLineParser.h CommandLineParser.cpp
-
 )
 
 
@@ -254,8 +298,8 @@ install(PROGRAMS
 )
 
 
-# 同梱しているQt5ライブラリのインストールルール
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Qt/
+# 同梱しているQt 5 または Qt 6ライブラリのインストールルール
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Qt${QT_VERSION_MAJOR}/
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/Qt
         FILES_MATCHING PATTERN "*"
 )

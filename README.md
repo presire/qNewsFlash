@@ -35,6 +35,16 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 * 朝日新聞デジタル  
   ただし、RSSフィードに掲載されている記事には有料記事が多いため、デフォルトでは無効です。  
 
+* 毎日新聞  
+  ニュース記事の概要を取得するためにXPath式を使用しています。  
+  それ以外の情報はRSSフィードから取得しています。  
+  <br>
+  <u>※注意</u>  
+  <u>XPath式を使用して記事の本文を取得しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
+  <br>
+  毎日新聞のRSSに関する注意事項は、下記のURLをご参照ください。  
+  https://mainichi.jp/rss/
+
 * CNET Japan  
   ニュース記事の概要を取得するためにXPath式を使用しています。  
   <br>
@@ -45,6 +55,7 @@ qNewsFlashは、News APIや時事ドットコム等のニュース記事を取�
 
 * ロイター通信  
   ニュース記事の概要を取得するためにXPath式を使用しています。  
+  それ以外の情報はRSSフィードから取得しています。  
   <br>
   <u>※注意</u>  
   <u>XPath式を使用して記事の本文を取得しているため、Webサイトの構成が変更された場合、併せてXpath式を変更する必要があります。</u>  
@@ -82,8 +93,8 @@ Raspberry Pi上での動作は確認済みです。
 **ご要望があれば、逐次開発を進めていく予定です。**  
 <br>
 
-今後の予定  
--  
+## 今後の予定  
+特に予定はありません。  
 <br>
 <br>
 
@@ -197,7 +208,16 @@ Ninjaビルドを使用する場合は、<code>cmake</code>コマンドに<code>
   ( libxml 2.0ライブラリが、/opt/libxml2ディレクトリにインストールされている場合 )  
   <br>
   libxml 2.0ライブラリのpkgconfigディレクトリのパスを指定することにより、  
-  任意のディレクトリにインストールされているlibxml 2.0ライブラリを使用して、このソフトウェアをコンパイルすることができます。  
+  任意のディレクトリにインストールされているlibxml 2.0ライブラリを使用して、本ソフトウェアをコンパイルすることができます。  
+  通常、あまり使用しないと思われます。  
+  <br>
+* <code>WITH_OPENSSL3</code>  
+  デフォルト値 : 空欄  
+  使用例 : <code>-DWITH_OPENSSL3=/opt/openssl3</code>  
+  ( OpenSSL 3ライブラリが、/opt/openssl3ディレクトリにインストールされている場合 )  
+  <br>
+  OpenSSL 3ライブラリのインストールディレクトリのパスを指定することにより、  
+  任意のディレクトリにインストールされているOpenSSL 3ライブラリを使用して、本ソフトウェアをコンパイルすることができます。  
   通常、あまり使用しないと思われます。  
 
 <br>
@@ -208,7 +228,7 @@ Ninjaビルドを使用する場合は、<code>cmake</code>コマンドに<code>
           -DSYSTEMD=user  \  # Systemdサービスファイルをホームディレクトリにインストールする場合  
           -DPID=/tmp      \  # Systemdサービスを使用する場合
           ..  
-    
+
     make -j $(nproc)  
     
     make install  または  sudo make install  
@@ -606,6 +626,23 @@ qNewsFlashの設定ファイルであるqNewsFlash.jsonファイルでは、
   * rss  
     デフォルト値 : <code>"https://www.asahi.com/rss/asahi/newsheadlines.rdf"</code>  
     朝日新聞デジタルのRSSのURLを指定します。  
+    <br>
+* mainichi  
+  * enable  
+    デフォルト値 : <code>true</code>  
+    毎日新聞からニュースを取得するかどうかを指定します。  
+    デフォルトは有効です。  
+    <br>
+  * rss  
+    デフォルト値 : <code>"https://mainichi.jp/rss/etc/mainichi-flash.rss"</code>  
+    毎日新聞のRSSのURLを指定します。  
+    <br>
+  * paraxpath  
+    デフォルト値 : <code>"/html/head/meta[@name='description']/@content"</code>  
+    毎日新聞のRSSでは、ニュース記事の概要欄に情報が無いため、  
+    該当するニュース記事のURLにアクセスして、ニュース記事の概要を抽出しています。  
+    <br>
+    その概要を取得するためのXPathを指定します。  
     <br>
 * cnet  
   * enable  

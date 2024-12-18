@@ -19,6 +19,7 @@
 #include "CommandLineParser.h"
 
 
+// メイン処理のコンストラクタ
 #ifdef Q_OS_LINUX
 Runner::Runner(QStringList _args, QString user, QObject *parent) : m_args(std::move(_args)), m_User(std::move(user)), m_SysConfFile(""), m_interval(30 * 60 * 1000),
     m_pNotifier(std::make_unique<QSocketNotifier>(fileno(stdin), QSocketNotifier::Read, this)), m_stopRequested(false),
@@ -38,7 +39,7 @@ Runner::Runner(QStringList _args, QObject *parent) : m_args(std::move(_args)), m
 #endif
 
 
-
+// このソフトウェアを最初に実行する時にのみ実行するメイン処理
 void Runner::run()
 {
     // メイン処理
@@ -233,8 +234,8 @@ void Runner::run()
             m_KyodoTimer.start(static_cast<int>(m_Kyodointerval));
         }
 
+        // !bottomコマンドの書き込みタイマの開始
         if (m_WriteInfo.BottomThread) {
-            // !bottomコマンドの書き込みタイマの開始
             connect(&m_BottomTimer, &QTimer::timeout, this, &Runner::bottomThread);
             m_BottomTimer.start(static_cast<int>(m_Bottominterval));
         }
@@ -265,6 +266,7 @@ void Runner::run()
 }
 
 
+// 速報ニュース以外のニュース記事の取得する
 void Runner::fetchNonBreakingNews()
 {
     // 現在の日時を取得して日付が変わっているかどうかを確認
@@ -407,6 +409,29 @@ void Runner::fetchNonBreakingNews()
         /// レスポンス待機
         QEventLoop loop;
         QObject::connect(this, &Runner::Asahifinished, &loop, &QEventLoop::quit);
+        loop.exec();
+    }
+
+    // [q]キーまたは[Q]キー ==> [Enter]キーが押下されている場合は終了
+    if (m_stopRequested.load()) return;
+
+    // 毎日新聞の記事を取得
+    if (m_bMainichi) {
+        // 毎日新聞のRSSフィードのURLを指定
+        QUrl urlMainichi(m_MainichiRSS);
+
+        /// HTTPリクエストを作成して、ヘッダを設定
+        QNetworkRequest requestMainichi(urlMainichi);
+
+        /// HTTPリクエストを送信
+        m_pReplyMainichi = manager->get(requestMainichi);
+
+        /// HTTPレスポンスを受信した後、Runner::fetchMainichiRSS()メソッドを実行
+        QObject::connect(m_pReplyMainichi, &QNetworkReply::finished, this, &Runner::fetchMainichiRSS);
+
+        /// レスポンス待機
+        QEventLoop loop;
+        QObject::connect(this, &Runner::Mainichifinished, &loop, &QEventLoop::quit);
         loop.exec();
     }
 
@@ -570,6 +595,7 @@ void Runner::fetchNonBreakingNews()
 }
 
 
+// News APIからニュース記事の取得後に実行する
 void Runner::fetchNewsAPI()
 {
     if (m_pReply->error() == QNetworkReply::NoError) {
@@ -644,6 +670,7 @@ void Runner::fetchNewsAPI()
 }
 
 
+// 時事ドットコムからニュース記事の取得後に実行する
 void Runner::fetchJiJiRSS()
 {
     auto byteArray  = m_pReplyJiJi->readAll();
@@ -680,6 +707,7 @@ void Runner::fetchJiJiRSS()
 }
 
 
+// 時事ドットコムのニュース記事(RSS)を分解して取得する
 void Runner::itemTagsforJiJi(xmlNode *a_node)
 {
     for (auto cur_node = a_node; cur_node; cur_node = cur_node->next) {
@@ -767,6 +795,7 @@ void Runner::itemTagsforJiJi(xmlNode *a_node)
 }
 
 
+// 共同通信からニュース記事の取得後に実行する
 void Runner::fetchKyodoRSS()
 {
     auto byteArray  = m_pReplyKyodo->readAll();
@@ -803,6 +832,7 @@ void Runner::fetchKyodoRSS()
 }
 
 
+// 共同通信のニュース記事(RSS)を分解して取得する
 void Runner::itemTagsforKyodo(xmlNode *a_node)
 {
     for (auto cur_node = a_node; cur_node; cur_node = cur_node->next) {
@@ -916,6 +946,7 @@ void Runner::itemTagsforKyodo(xmlNode *a_node)
 }
 
 
+// 朝日新聞デジタルからニュース記事の取得後に実行する
 void Runner::fetchAsahiRSS()
 {
     auto byteArray  = m_pReplyAsahi->readAll();
@@ -952,6 +983,7 @@ void Runner::fetchAsahiRSS()
 }
 
 
+// 朝日新聞デジタルのニュース記事(RSS)を分解して取得する
 void Runner::itemTagsforAsahi(xmlNode *a_node)
 {
     for (auto cur_node = a_node; cur_node; cur_node = cur_node->next) {
@@ -1041,6 +1073,129 @@ void Runner::itemTagsforAsahi(xmlNode *a_node)
 }
 
 
+// 毎日新聞からニュース記事の取得後に実行する
+void Runner::fetchMainichiRSS()
+{
+    auto byteArray  = m_pReplyMainichi->readAll();
+    auto xmlContent = byteArray.constData();
+
+    // libxml2の初期化
+    xmlInitParser();
+    LIBXML_TEST_VERSION
+
+    // メモリバッファからXMLをパース
+    auto *doc = xmlReadMemory(xmlContent, byteArray.size(), "noname.xml", nullptr, 0);
+    if (doc == nullptr) {
+        std::cerr << "Failed to parse XML from memory" << std::endl;
+        emit Mainichifinished();
+
+        return;
+    }
+
+    // ルート要素を取得
+    auto *root_element = xmlDocGetRootElement(doc);
+
+    // 各itemタグを処理
+    itemTagsforMainichi(root_element);
+
+    // ドキュメントを解放
+    xmlFreeDoc(doc);
+
+    // libxml2をクリーンアップ
+    xmlCleanupParser();
+
+    m_pReplyMainichi->deleteLater();
+
+    emit Mainichifinished();
+}
+
+
+// 毎日新聞のニュース記事(RSS)を分解して取得する
+void Runner::itemTagsforMainichi(xmlNode *a_node)
+{
+    for (auto cur_node = a_node; cur_node; cur_node = cur_node->next) {
+        if (cur_node->type == XML_ELEMENT_NODE && xmlStrcmp(cur_node->name, BAD_CAST "item") == 0) {
+            xmlNode *itemChild = cur_node->children;
+            QString title       = "",
+                    paragraph   = "",
+                    link        = "",
+                    date        = "";
+            bool    bSkipNews   = false;
+
+            while (itemChild) {
+                if (itemChild->type == XML_ELEMENT_NODE) {
+                    if (xmlStrcmp(itemChild->name, BAD_CAST "title") == 0) {
+                        title = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
+                    }
+                    else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
+                        // ニュース記事のURLを取得
+                        link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
+
+                        // ニュース記事のURLからHTMLタグを解析した後、記事の概要を取得して指定文字数分のみ取得
+                        QUrl url(link);
+                        HtmlFetcher fetcher(m_MaxParagraph, this);
+
+                        if (fetcher.fetch(url, true, m_MainichiParaXPath)) {
+                            // 本文の取得に失敗した場合
+                            bSkipNews = true;
+                            break;
+                        }
+
+                        // ニュース記事の概要を取得
+                        // 本文の先頭および最後尾に空白が入ることがあるため消去
+                        paragraph = fetcher.getParagraph().trimmed();
+                    }
+                    else if (xmlStrcmp(itemChild->name, BAD_CAST "date") == 0) {
+                        date = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
+
+                        // 日付のフォーマットをISO 8601形式から"yyyy年M月d日 h時m分"へ変更
+                        date = convertDate(date);
+
+                        // ニュースの公開日を確認
+                        auto isCheckDate = m_WithinHours == 0 ? isToday(date) : isHoursAgo(date);
+                        if (!isCheckDate) {
+                            bSkipNews = true;
+                            break;
+                        }
+                    }
+                }
+                itemChild = itemChild->next;
+            }
+
+            // 今日のニュース記事ではない場合、または、指定時間以内のニュース記事ではない場合は無視
+            if (bSkipNews) continue;
+
+            // 既に書き込み済みの記事の場合は無視
+            bool bWritten = false;
+            for (auto &writtenArticle : m_WrittenArticles) {
+                QString url = "";
+                std::tie(std::ignore, std::ignore, url, std::ignore) = writtenArticle.getArticleData();
+
+                if (url.compare(link, Qt::CaseSensitive) == 0) {
+                    bWritten = true;
+                    break;
+                }
+            }
+            if (bWritten) continue;
+
+            // 書き込む前の記事群
+            Article article(title, paragraph, link, date);
+            m_BeforeWritingArticles.append(article);
+
+#ifdef _DEBUG
+            qDebug() << "Title : " << title;
+            qDebug() << "Paragraph : " << paragraph;
+            qDebug() << "URL : " << link;
+            qDebug() << "Date : " << date;
+            qDebug() << "";
+#endif
+        }
+        itemTagsforMainichi(cur_node->children);
+    }
+}
+
+
+// CNET Japanからニュース記事の取得後に実行する
 void Runner::fetchCNetRSS()
 {
     auto byteArray  = m_pReplyCNet->readAll();
@@ -1077,6 +1232,7 @@ void Runner::fetchCNetRSS()
 }
 
 
+// CNET Japanのニュース記事(RSS)を分解して取得する
 void Runner::itemTagsforCNet(xmlNode *a_node)
 {
     for (auto cur_node = a_node; cur_node; cur_node = cur_node->next) {
@@ -1096,22 +1252,22 @@ void Runner::itemTagsforCNet(xmlNode *a_node)
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "description") == 0) {
                         // 現在、RSSからニュース記事の概要を取得しない
                         // 該当するニュース記事のURLにアクセスして、記事の概要を抽出する
-//                        paragraph = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
+                        // paragraph = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
 
-//                        // 不要なhtmlタグを除去
-//                        static QRegularExpression re2("<br .*</a>", QRegularExpression::DotMatchesEverythingOption);
-//                        paragraph.remove(re2);
+                        // // 不要なhtmlタグを除去
+                        // static QRegularExpression re2("<br .*</a>", QRegularExpression::DotMatchesEverythingOption);
+                        // paragraph.remove(re2);
 
-//                        // 不要な文字を削除 (\n, \t)
-//                        static QRegularExpression re1("[\t\n]", QRegularExpression::CaseInsensitiveOption);
-//                        paragraph = paragraph.replace(re1, "");
+                        // // 不要な文字を削除 (\n, \t)
+                        // static QRegularExpression re1("[\t\n]", QRegularExpression::CaseInsensitiveOption);
+                        // paragraph = paragraph.replace(re1, "");
 
-//                        // 不要な文字を削除 (スペース等)
-//                        static QRegularExpression re3("[\\s]", QRegularExpression::CaseInsensitiveOption);
-//                        paragraph = paragraph.replace(re3, "").replace(" ", "").replace("\u3000", "");
+                        // // 不要な文字を削除 (スペース等)
+                        // static QRegularExpression re3("[\\s]", QRegularExpression::CaseInsensitiveOption);
+                        // paragraph = paragraph.replace(re3, "").replace(" ", "").replace("\u3000", "");
 
-//                        // 本文が指定文字数以上の場合、指定文字数分のみを抽出
-//                        paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
+                        // // 本文が指定文字数以上の場合、指定文字数分のみを抽出
+                        // paragraph = paragraph.size() > m_MaxParagraph ? paragraph.mid(0, static_cast<int>(m_MaxParagraph)) + QString("...") : paragraph;
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
                         // ニュース記事のURLを取得
@@ -1180,6 +1336,7 @@ void Runner::itemTagsforCNet(xmlNode *a_node)
 }
 
 
+// ハンギョレジャパンからニュース記事の取得後に実行する
 void Runner::fetchHanJRSS()
 {
     auto byteArray  = m_pReplyHanJ->readAll();
@@ -1216,6 +1373,7 @@ void Runner::fetchHanJRSS()
 }
 
 
+// ハンギョレジャパンのニュース記事(RSS)を分解して取得する
 void Runner::itemTagsforHanJ(xmlNode *a_node)
 {
     for (auto cur_node = a_node; cur_node; cur_node = cur_node->next) {
@@ -1255,16 +1413,16 @@ void Runner::itemTagsforHanJ(xmlNode *a_node)
                         link = m_HanJTopURL + link;
 
                         // ニュース記事のURLからHTMLタグを解析した後、本文を取得して指定文字数分のみ取得 (現在は使用しない)
-//                        QUrl url(link);
-//                        HtmlFetcher fetcher(m_MaxParagraph, this);
+                        // QUrl url(link);
+                        // HtmlFetcher fetcher(m_MaxParagraph, this);
 
-//                        if (fetcher.fetch(url, true, QString("//head/meta[@property='og:description']/@content"))) {
-//                            // 本文の取得に失敗した場合
-//                            bSkipNews = true;
-//                            break;
-//                        }
+                        // if (fetcher.fetch(url, true, QString("//head/meta[@property='og:description']/@content"))) {
+                        //     // 本文の取得に失敗した場合
+                        //     bSkipNews = true;
+                        //     break;
+                        // }
 
-//                        paragraph = fetcher.getParagraph();
+                        // paragraph = fetcher.getParagraph();
                     }
                     else if (xmlStrcmp(itemChild->name, BAD_CAST "pubDate") == 0) {
                         date = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
@@ -1316,6 +1474,7 @@ void Runner::itemTagsforHanJ(xmlNode *a_node)
 }
 
 
+// ロイター通信からニュース記事の取得後に実行する
 void Runner::fetchReutersRSS()
 {
     auto byteArray  = m_pReplyReuters->readAll();
@@ -1352,6 +1511,105 @@ void Runner::fetchReutersRSS()
 }
 
 
+// ロイター通信のニュース記事(RSS)を分解して取得
+void Runner::itemTagsforReuters(xmlNode *a_node)
+{
+    for (auto cur_node = a_node; cur_node; cur_node = cur_node->next) {
+        if (cur_node->type == XML_ELEMENT_NODE && xmlStrcmp(cur_node->name, BAD_CAST "item") == 0) {
+            xmlNode *itemChild = cur_node->children;
+            QString title       = "",
+                paragraph   = "",
+                link        = "",
+                date        = "";
+            bool    bSkipNews   = false;
+
+            while (itemChild) {
+                if (itemChild->type == XML_ELEMENT_NODE) {
+                    if (xmlStrcmp(itemChild->name, BAD_CAST "title") == 0) {
+                        title = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
+                    }
+                    else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
+                        // ニュース記事のURLを取得
+                        link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
+
+                        // ニュース記事のURLからHTMLタグを解析した後、記事の概要を取得して指定文字数分のみ取得
+                        QUrl url(link);
+                        HtmlFetcher fetcher(m_MaxParagraph, this);
+
+                        if (fetcher.fetch(url, true, m_ReutersParaXPath)) {
+                            // 本文の取得に失敗した場合
+                            bSkipNews = true;
+                            break;
+                        }
+
+                        // ニュース記事の概要を取得
+                        paragraph = fetcher.getParagraph();
+                    }
+                    else if (xmlStrcmp(itemChild->name, BAD_CAST "date") == 0) {
+                        date = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
+
+                        // 日付のフォーマットをISO 8601形式から"yyyy年M月d日 h時m分"へ変更
+                        date = convertDate(date);
+
+                        // ニュースの公開日を確認
+                        auto isCheckDate = m_WithinHours == 0 ? isToday(date) : isHoursAgo(date);
+                        if (!isCheckDate) {
+                            bSkipNews = true;
+                            break;
+                        }
+                    }
+                }
+                itemChild = itemChild->next;
+            }
+
+            // 今日のニュース記事ではない場合、または、指定時間以内のニュース記事ではない場合は無視
+            if (bSkipNews) continue;
+
+            // 既に書き込み済みの記事の場合は無視
+            bool bWritten = false;
+            for (auto &writtenArticle : m_WrittenArticles) {
+                QString url = "";
+                std::tie(std::ignore, std::ignore, url, std::ignore) = writtenArticle.getArticleData();
+
+                if (url.compare(link, Qt::CaseSensitive) == 0) {
+                    bWritten = true;
+                    break;
+                }
+            }
+            if (bWritten) continue;
+
+            // ロイター通信のRSSでは、1つのRSSに同じ記事が複数存在する場合がある
+            // そのため、同じ記事が存在するかどうか確認して、存在する場合は無視する
+            bool bIdenticalArticle = false;
+            for (auto &beforeArticle : m_BeforeWritingArticles) {
+                QString url = "";
+                std::tie(std::ignore, std::ignore, url, std::ignore) = beforeArticle.getArticleData();
+
+                if (url.compare(link, Qt::CaseSensitive) == 0) {
+                    bIdenticalArticle = true;
+                    break;
+                }
+            }
+            if (bIdenticalArticle) continue;
+
+            // 書き込む前の記事群
+            Article article(title, paragraph, link, date);
+            m_BeforeWritingArticles.append(article);
+
+#ifdef _DEBUG
+            qDebug() << "Title : " << title;
+            qDebug() << "Paragraph : " << paragraph;
+            qDebug() << "URL : " << link;
+            qDebug() << "Date : " << date;
+            qDebug() << "";
+#endif
+        }
+        itemTagsforReuters(cur_node->children);
+    }
+}
+
+
+// 東京新聞からニュース記事の取得後に実行する
 void Runner::fetchTokyoNP()
 {
     HtmlFetcher fetcher(m_MaxParagraph, this);
@@ -1545,6 +1803,7 @@ void Runner::fetchTokyoNP()
 }
 
 
+// 時事ドットコムから速報記事の取得する
 void Runner::JiJiFlashfetch()
 {
     // 時事ドットコムの速報記事を取得するかどうかを確認
@@ -1696,6 +1955,7 @@ void Runner::JiJiFlashfetch()
 }
 
 
+// 共同通信から速報記事の取得するスロット
 void Runner::KyodoFlashfetch()
 {
     // 時事ドットコムの速報記事を取得するかどうかを確認
@@ -1789,16 +2049,17 @@ void Runner::KyodoFlashfetch()
 
 #ifdef _DEBUG
     qDebug() << "書き込む速報記事";
-    qDebug() << "Title : " << title;
-    qDebug() << "URL : " << link;
-    qDebug() << "Date : " << pubDate;
+    qDebug() << "Title : "      << title;
+    qDebug() << "Paragraph : "  << paragraph;
+    qDebug() << "URL : "        << link;
+    qDebug() << "Date : "       << pubDate;
     qDebug() << "";
 #endif
 
     // 書き込みモードの設定
-    m_pWriteMode->setArticle(title, "", link, pubDate);     // 書き込むニュース記事を指定
-    m_pWriteMode->setThreadInfo(m_ThreadInfo);              // スレッド情報に関する設定を指定
-    m_pWriteMode->setWriteInfo(m_WriteInfo);                // 書き込み情報に関する設定を指定
+    m_pWriteMode->setArticle(title, paragraph.isEmpty() ? "" : paragraph, link, pubDate);  // 書き込むニュース記事を指定
+    m_pWriteMode->setThreadInfo(m_ThreadInfo);                                             // スレッド情報に関する設定を指定
+    m_pWriteMode->setWriteInfo(m_WriteInfo);                                               // 書き込み情報に関する設定を指定
 
     // ニュース記事の書き込み
     if (m_WriteMode == 1 || m_WriteMode == 3) {
@@ -1847,103 +2108,7 @@ void Runner::KyodoFlashfetch()
 }
 
 
-void Runner::itemTagsforReuters(xmlNode *a_node)
-{
-    for (auto cur_node = a_node; cur_node; cur_node = cur_node->next) {
-        if (cur_node->type == XML_ELEMENT_NODE && xmlStrcmp(cur_node->name, BAD_CAST "item") == 0) {
-            xmlNode *itemChild = cur_node->children;
-            QString title       = "",
-                    paragraph   = "",
-                    link        = "",
-                    date        = "";
-            bool    bSkipNews   = false;
-
-            while (itemChild) {
-                if (itemChild->type == XML_ELEMENT_NODE) {
-                    if (xmlStrcmp(itemChild->name, BAD_CAST "title") == 0) {
-                        title = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
-                    }
-                    else if (xmlStrcmp(itemChild->name, BAD_CAST "link") == 0) {
-                        // ニュース記事のURLを取得
-                        link = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
-
-                        // ニュース記事のURLからHTMLタグを解析した後、記事の概要を取得して指定文字数分のみ取得
-                        QUrl url(link);
-                        HtmlFetcher fetcher(m_MaxParagraph, this);
-
-                        if (fetcher.fetch(url, true, m_ReutersParaXPath)) {
-                            // 本文の取得に失敗した場合
-                            bSkipNews = true;
-                            break;
-                        }
-
-                        // ニュース記事の概要を取得
-                        paragraph = fetcher.getParagraph();
-                    }
-                    else if (xmlStrcmp(itemChild->name, BAD_CAST "date") == 0) {
-                        date = QString::fromUtf8(reinterpret_cast<const char*>(xmlNodeGetContent(itemChild)));
-
-                        // 日付のフォーマットをISO 8601形式から"yyyy年M月d日 h時m分"へ変更
-                        date = convertDate(date);
-
-                        // ニュースの公開日を確認
-                        auto isCheckDate = m_WithinHours == 0 ? isToday(date) : isHoursAgo(date);
-                        if (!isCheckDate) {
-                            bSkipNews = true;
-                            break;
-                        }
-                    }
-                }
-                itemChild = itemChild->next;
-            }
-
-            // 今日のニュース記事ではない場合、または、指定時間以内のニュース記事ではない場合は無視
-            if (bSkipNews) continue;
-
-            // 既に書き込み済みの記事の場合は無視
-            bool bWritten = false;
-            for (auto &writtenArticle : m_WrittenArticles) {
-                QString url = "";
-                std::tie(std::ignore, std::ignore, url, std::ignore) = writtenArticle.getArticleData();
-
-                if (url.compare(link, Qt::CaseSensitive) == 0) {
-                    bWritten = true;
-                    break;
-                }
-            }
-            if (bWritten) continue;
-
-            // ロイター通信のRSSでは、1つのRSSに同じ記事が複数存在する場合がある
-            // そのため、同じ記事が存在するかどうか確認して、存在する場合は無視する
-            bool bIdenticalArticle = false;
-            for (auto &beforeArticle : m_BeforeWritingArticles) {
-                QString url = "";
-                std::tie(std::ignore, std::ignore, url, std::ignore) = beforeArticle.getArticleData();
-
-                if (url.compare(link, Qt::CaseSensitive) == 0) {
-                    bIdenticalArticle = true;
-                    break;
-                }
-            }
-            if (bIdenticalArticle) continue;
-
-            // 書き込む前の記事群
-            Article article(title, paragraph, link, date);
-            m_BeforeWritingArticles.append(article);
-
-#ifdef _DEBUG
-            qDebug() << "Title : " << title;
-            qDebug() << "Paragraph : " << paragraph;
-            qDebug() << "URL : " << link;
-            qDebug() << "Date : " << date;
-            qDebug() << "";
-#endif
-        }
-        itemTagsforReuters(cur_node->children);
-    }
-}
-
-
+// UTC時刻から日本時間および"yyyy/M/d h時m分"に変換する (News API等で使用)
 QString Runner::convertJPDate(QString &strDate)
 {
     QString formattedDateString = "";
@@ -2004,6 +2169,7 @@ QString Runner::convertJPDateforKyodo(QString &strDate)
 }
 
 
+// ISO8601形式の時刻を"yyyy年M月d日 H時m分"に変換 (時事ドットコム、ロイター通信等で使用)
 QString Runner::convertDate(QString &strDate)
 {
     // ISO 8601形式 (YYYY-MM-DDTHH:mm:SS+XX:XX) の日時列を解析
@@ -2021,6 +2187,7 @@ QString Runner::convertDate(QString &strDate)
 }
 
 
+// RFC 2822形式の時刻を"yyyy年M月d日 H時m分"に変換 (ハンギョレジャパン等で使用)
 QString Runner::convertDateHanJ(QString &strDate)
 {
     // RFC 2822形式の日時列を解析
@@ -2039,6 +2206,7 @@ QString Runner::convertDateHanJ(QString &strDate)
 }
 
 
+// ニュース記事が今日の日付かどうかを確認
 bool Runner::isToday(const QString &dateString)
 {
     // 日付フォーマットを指定
@@ -2064,6 +2232,7 @@ bool Runner::isToday(const QString &dateString)
 }
 
 
+// ニュース記事が指定時間以内の時刻かどうかを確認
 bool Runner::isHoursAgo(const QString &pubDate) const
 {
     // 日付フォーマットを指定
@@ -2083,13 +2252,12 @@ bool Runner::isHoursAgo(const QString &pubDate) const
     QDateTime todayTime = QDateTime::currentDateTime();
     todayTime.setTimeZone(QTimeZone("Asia/Tokyo"));
 
-    // 3時間前の日時を計算
+    // N時間前の日時を計算
     QDateTime hoursAgo = todayTime.addSecs(- m_WithinHours * 60 * 60);
 
-    // ニュース記事の公開日時が現在日時の3時間前以内にあるかどうかを確認
+    // ニュース記事の公開日時が現在日時の指定時間以内にあるかどうかを確認
     bool isInTargetDateTime = (convertPubDate >= hoursAgo && convertPubDate <= todayTime);
 
-    // ニュース記事の公開日時が3時間前以内の記事かどうかを判断
     return isInTargetDateTime;
 }
 
@@ -2267,6 +2435,15 @@ int Runner::getConfiguration(QString &filepath)
         auto AsahiObject    = JsonObject["asahi"].toObject();         /// 朝日新聞デジタルのニュースオブジェクトの取得
         m_bAsahi            = AsahiObject["enable"].toBool(false);    /// 朝日新聞デジタルの有効 / 無効
         m_AsahiRSS          = AsahiObject["rss"].toString("");        /// 朝日新聞デジタルからニュース記事を取得するためのRSS (URL)
+
+        // 毎日新聞のニュース記事
+        auto MainichiObject  = JsonObject["mainichi"].toObject();         /// 毎日新聞のニュースオブジェクトの取得
+        m_bMainichi          = MainichiObject["enable"].toBool(false);    /// 毎日新聞の有効 / 無効
+        m_MainichiRSS        = MainichiObject["rss"].toString("");        /// 毎日新聞からニュース記事を取得するためのRSS (URL)
+        m_MainichiParaXPath  = MainichiObject["paraxpath"].toString("");  /// 毎日新聞からニュース記事の概要を取得するためのXPath式
+        if (m_bMainichi && (m_MainichiRSS.isEmpty() || m_MainichiParaXPath.isEmpty())) {
+            std::cerr << QString("エラー : 毎日新聞が有効になっていますが、\"rss\"もしくは\"paraxpath\"の値が設定されていません").toStdString() << std::endl;
+        }
 
         // ハンギョレジャパンのニュース記事
         auto HanJObject     = JsonObject["hanj"].toObject();          /// ハンギョレジャパンのニュースオブジェクトの取得

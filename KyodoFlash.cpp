@@ -47,13 +47,20 @@ int KyodoFlash::FetchFlash()
     if (title.endsWith(" ")) title.chop(1);
 
     // 速報記事のURLにアクセスして速報記事の本文を取得
-    if (fetcher.fetchParagraphKyodoFlash(link, true, m_FlashInfo.ParaXPath)) {
-        std::cerr << QString("エラー : (共同通信) 速報記事の本文の取得に失敗").toStdString() << std::endl;
-        return -1;
-    }
+    // 現在、速報記事の本文の取得に失敗した場合でもエラーとしない
+    // if (fetcher.fetchParagraphKyodoFlash(link, true, m_FlashInfo.ParaXPath)) {
+    //     std::cerr << QString("エラー : (共同通信) 速報記事の本文の取得に失敗").toStdString() << std::endl;
+    //     return -1;
+    // }
+
+    // /// 速報記事の本文を取得
+    // auto paragraph = fetcher.GetElement();
+
+    [[__maybe_unused__]] auto iRet = fetcher.fetchParagraphKyodoFlash(link, true, m_FlashInfo.ParaXPath);
 
     /// 速報記事の本文を取得
-    auto paragraph = fetcher.GetElement();
+    /// 現在の仕様では、本文の取得に失敗した場合は空欄とする
+    auto paragraph = iRet == 0 ? fetcher.GetElement() : "";
 
     /// 末尾の半角スペースを削除
     if (paragraph.endsWith(" ")) paragraph.chop(1);

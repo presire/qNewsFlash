@@ -271,10 +271,10 @@ int Poster::replyPostFinished(QNetworkReply *reply, const QUrl &url, const THREA
         QString replyData;
 
         if (ThreadInfo.shiftjis) {
-            // Shift-JISからUTF-8へエンコード
+            // Shift-JISからUTF-8へデコード
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-            QStringEncoder encoder("Shift-JIS");
-            replyData = encoder(reply->readAll());
+            QStringDecoder decoder("Shift-JIS");
+            replyData = decoder(reply->readAll());
 #else
             QTextCodec *codec;
             codec     = QTextCodec::codecForName("Shift-JIS");

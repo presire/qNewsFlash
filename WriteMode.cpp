@@ -1610,7 +1610,7 @@ int WriteMode::writeBottomLogInitialization(THREAD_INFO tInfo, WRITE_INFO wInfo,
             File.resize(File.pos());
         }
         else {
-            std::cout << QString("ログファイル: 起動時に!bottomコマンドが必要なオブジェクトはありません").toStdString() << std::endl;
+            std::cout << QString("ログファイル: 起動時に!bottomコマンドが必要なスレッドはありません").toStdString() << std::endl << std::endl;
         }
     }
     catch (const std::runtime_error &e) {
