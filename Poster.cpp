@@ -84,10 +84,14 @@ int Poster::PostforWriteThread(const QUrl &url, THREAD_INFO &ThreadInfo)
     }
     else {
         // Shift-JIS用
+        // Shift-JISに変換不可能な文字が存在する場合は、文字参照に変換
+        ThreadInfo.from    = convertNonSjisToReference(ThreadInfo.from);
+        ThreadInfo.message = convertNonSjisToReference(ThreadInfo.message);
+
         QString postMessage = QString("subject=%1&FROM=%2&mail=%3&MESSAGE=%4&bbs=%5&time=%6&key=%7")
                                   .arg("",                              // スレッドのタイトル (スレッドに書き込む場合は空欄にする)
-                                       ThreadInfo.from,                 // 名前欄
-                                       ThreadInfo.mail,                 // メール欄
+                                       urlEncode(ThreadInfo.from),      // 名前欄
+                                       urlEncode(ThreadInfo.mail),      // メール欄
                                        urlEncode(ThreadInfo.message),   // 書き込む内容
                                        ThreadInfo.bbs,                  // BBS名
                                        ThreadInfo.time,                 // エポックタイム (UNIXタイムまたはPOSIXタイム)
@@ -155,10 +159,15 @@ int Poster::PostforCreateThread(const QUrl &url, THREAD_INFO &ThreadInfo)
     }
     else {
         // Shift-JIS用
+        // Shift-JISに変換不可能な文字が存在する場合は、文字参照に変換
+        ThreadInfo.subject = convertNonSjisToReference(ThreadInfo.subject);
+        ThreadInfo.from    = convertNonSjisToReference(ThreadInfo.from);
+        ThreadInfo.message = convertNonSjisToReference(ThreadInfo.message);
+
         QString postMessage = QString("subject=%1&FROM=%2&mail=%3&MESSAGE=%4&bbs=%5&time=%6")
                                   .arg(urlEncode(ThreadInfo.subject),   // スレッドのタイトル (スレッドを立てる場合のみ入力)
-                                       ThreadInfo.from,                 // 名前欄
-                                       ThreadInfo.mail,                 // メール欄
+                                       urlEncode(ThreadInfo.from),      // 名前欄
+                                       urlEncode(ThreadInfo.mail),      // メール欄
                                        urlEncode(ThreadInfo.message),   // 書き込む内容
                                        ThreadInfo.bbs,                  // BBS名
                                        ThreadInfo.time                  // エポックタイム (UNIXタイムまたはPOSIXタイム)
@@ -357,19 +366,197 @@ QString Poster::GetNewThreadTitle() const
 
 
 // 文字列をShift-JISにエンコードする
-[[maybe_unused]] QByteArray Poster::encodeStringToShiftJIS(const QString &str)
+QString Poster::convertToShiftJIS(const QString &input)
 {
-    QByteArray ShiftJISData;
+    QString result;
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     QStringEncoder encoder("Shift-JIS");
-    ShiftJISData = encoder(str);
+    QStringDecoder decoder("Shift-JIS");
+
+    // 文字列を1文字ずつ処理
+    for (int i = 0; i < input.length(); i++) {
+        QChar currentChar = input.at(i);
+
+        // 1文字をShift-JISに変換を試みる
+        QByteArray encoded = encoder.encode(QString(currentChar));
+
+        // 変換結果をデコードして元の文字と比較
+        QString decoded = decoder.decode(encoded);
+
+        if (!encoder.hasError() && !decoded.isEmpty() && decoded[0] == currentChar) {
+            // Shift-JISに変換可能な場合はそのまま追加
+            result.append(currentChar);
+        }
+        else {
+            // 変換できない場合は文字参照 (&#xHHHH;) 形式に変換
+            result.append(QString("&#x%1;").arg(currentChar.unicode(), 4, 16, QChar('0')));
+        }
+    }
 #else
-    QTextCodec *codec = QTextCodec::codecForName("Shift-JIS");
-    ShiftJISData = codec->fromUnicode(str);
+    QTextCodec *codecShiftJIS = QTextCodec::codecForName("Shift-JIS");
+
+    // 文字列を1文字ずつ処理
+    for (int i = 0; i < input.length(); i++) {
+        QChar currentChar = input.at(i);
+
+        // 現在の文字をShift-JISに変換を試みる
+        QByteArray encoded = codecShiftJIS->fromUnicode(currentChar);
+
+        // 変換結果をデコードして元の文字と比較
+        QString decoded = codecShiftJIS->toUnicode(encoded);
+        if (decoded.isEmpty() || decoded[0] != currentChar) {
+            // 変換できない場合は文字参照（&#xHHHH;）形式に変換
+            result.append(QString("&#x%1;").arg(currentChar.unicode(), 4, 16, QChar('0')));
+        }
+        else {
+            // Shift-JISに変換可能な場合はそのまま追加
+            result.append(currentChar);
+        }
+    }
 #endif
 
-    return ShiftJISData;
+    return result;
+}
+
+
+// Shift-JISバイト列として取得する
+QByteArray Poster::getShiftJISBytes(const QString &input)
+{
+    QString converted = convertToShiftJIS(input);
+
+    QByteArray encodeArray;
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    QStringEncoder encoder("Shift-JIS");
+    encodeArray = encoder.encode(converted);
+#else
+    QTextCodec* codecShiftJIS = QTextCodec::codecForName("Shift-JIS");
+    encodeArray = codecShiftJIS->fromUnicode(converted);
+#endif
+
+    return encodeArray;
+}
+
+
+QString Poster::convertNonSjisToReference(const QString &input)
+{
+    QString result;
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    QStringEncoder sjisEncoder(QStringConverter::Encoding::Shift_JIS);
+    QStringDecoder sjisDecoder(QStringConverter::Encoding::Shift_JIS);
+#else
+    QTextCodec* sjisCodec = QTextCodec::codecForName("Shift-JIS");
+#endif
+
+    // 入力文字列を1文字ずつ処理
+    for (const QChar& ch : input) {
+        QString currentChar(ch);
+        bool canConvertToSjis = false;
+
+        try {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            // Qt 6
+            QByteArray sjisEncoded = sjisEncoder.encode(currentChar);
+            if (!sjisEncoder.hasError()) {
+                QString roundTrip = sjisDecoder.decode(sjisEncoded);
+                if (!sjisDecoder.hasError()) {
+                    canConvertToSjis = (roundTrip == currentChar);
+                }
+            }
+#else
+            // Qt 5
+            QByteArray sjisEncoded = sjisCodec->fromUnicode(currentChar);
+            QString roundTrip = sjisCodec->toUnicode(sjisEncoded);
+            canConvertToSjis = (roundTrip == currentChar);
+#endif
+        }
+        catch (...) {
+            canConvertToSjis = false;
+        }
+
+        if (canConvertToSjis) {
+            // Shift-JISに変換可能な場合は、そのままUTF-8として追加
+            result.append(currentChar);
+        }
+        else {
+            // Shift-JISに変換できない場合は、文字参照形式に変換
+            result.append(QString("&#x%1;").arg(ch.unicode(), 4, 16, QChar('0')));
+        }
+    }
+
+    return result;
+
+    // 異体字セレクタ実装用 (現在は未使用)
+//     QString result;
+
+// #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+//     QStringEncoder sjisEncoder(QStringConverter::Encoding::Shift_JIS);
+//     QStringDecoder sjisDecoder(QStringConverter::Encoding::Shift_JIS);
+// #else
+//     QTextCodec* sjisCodec = QTextCodec::codecForName("Shift-JIS");
+// #endif
+
+//     // 入力文字列を1文字ずつ処理
+//     int i = 0;
+//     while (i < input.length()) {
+//         bool isFC = false;
+
+//         // 0xFCのシーケンスをチェック
+// #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+//         QByteArray encoded = sjisEncoder.encode(input.mid(i, 1));
+//         if (!sjisEncoder.hasError() && !encoded.isEmpty() &&
+//             static_cast<unsigned char>(encoded[0]) == 0xFC) {
+//             isFC = true;
+//         }
+// #else
+//         QByteArray encoded = sjisCodec->fromUnicode(input.mid(i, 1));
+//         if (!encoded.isEmpty() && static_cast<unsigned char>(encoded[0]) == 0xFC) {
+//             isFC = true;
+//         }
+// #endif
+
+//         if (isFC) {
+//             // 0xFCの場合は置換文字列を追加
+//             //result.append("希望の置換文字列を設定");
+//             i++;
+//         }
+//         else {
+//             QString currentChar(input[i]);
+//             bool canConvertToSjis = false;
+
+//             try {
+// #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+//                 QByteArray sjisEncoded = sjisEncoder.encode(currentChar);
+//                 if (!sjisEncoder.hasError()) {
+//                     QString roundTrip = sjisDecoder.decode(sjisEncoded);
+//                     if (!sjisDecoder.hasError()) {
+//                         canConvertToSjis = (roundTrip == currentChar);
+//                     }
+//                 }
+// #else
+//                 QByteArray sjisEncoded = sjisCodec->fromUnicode(currentChar);
+//                 QString roundTrip = sjisCodec->toUnicode(sjisEncoded);
+//                 canConvertToSjis = (roundTrip == currentChar);
+// #endif
+//             }
+//             catch (...) {
+//                 canConvertToSjis = false;
+//             }
+
+//             if (canConvertToSjis) {
+//                 result.append(currentChar);
+//             }
+//             else {
+//                 result.append(QString("&#x%1;").arg(currentChar[0].unicode(), 4, 16, QChar('0')));
+//             }
+
+//             i++;
+//         }
+//     }
+
+//     return result;
 }
 
 

@@ -56,16 +56,18 @@ private:
                                            m_NewThreadNum,      // 新規作成したスレッド番号
                                            m_NewThreadTitle;    // 新規作成したスレッドタイトル
 
-private:
+private:    // Methods
     // GETデータ(Webページ)を確認する
     int         replyCookieFinished(QNetworkReply *reply);                              // GETデータ(クッキー)を確認する
     int         replyPostFinished(QNetworkReply *reply, THREAD_INFO &ThreadInfo);       // POSTデータ送信後のレスポンスを確認する (既存のスレッドに書き込み用)
     int         replyPostFinished(QNetworkReply *reply, const QUrl &url,                // POSTデータ送信後のレスポンスを確認する (新規スレッド作成用)
                                   const THREAD_INFO &ThreadInfo);
-    [[maybe_unused]] static QByteArray  encodeStringToShiftJIS(const QString &str);     // 文字列をShift-JISにエンコードする
-    static QString     urlEncode(const QString &originalString);                        // URLエンコードする
+    static QByteArray getShiftJISBytes(const QString &input);                           // Shift-JISバイト列として取得する
+    static QString    convertToShiftJIS(const QString &input);                          // 文字列をShift-JISにエンコードする
+    static QString    convertNonSjisToReference(const QString &input);                  // Shift-JISに変換不可能な文字を文字参照 (&#xHHHH;) に変換する
+    static QString    urlEncode(const QString &originalString);                         // URLエンコードする
 
-public:
+public:     // Methods
     explicit    Poster(QObject *parent = nullptr);
     ~Poster() override = default;
     int         fetchCookies(const QUrl &url);                                  // 掲示板のクッキーを取得する
