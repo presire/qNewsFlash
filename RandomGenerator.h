@@ -7,17 +7,25 @@
 #include <cstdint>
 
 #ifdef Q_OS_LINUX
+    // x86/x64アーキテクチャの場合、TSC（タイムスタンプカウンタ）命令を使用
     #if defined(__x86_64__) || defined(__i386__)
     #include <x86intrin.h>
     #endif
 
+    // ARMアーキテクチャの場合、NEON/WMMX向けのヘッダーをインクルード
     #ifdef ARM_NEON
     #include <arm_neon.h>
     #elif ARM_WMMX
     #include <mmintrin.h>
     #endif
+
+    // RISC-V64アーキテクチャの場合
+    // RISC-V64では特別なSIMD命令ヘッダーは不要で、/dev/urandomを使用
+    #if defined(__riscv) && (__riscv_xlen == 64)
+    // RISC-V64では標準ライブラリのみ使用
+    #endif
 #elif Q_OS_WIN
-#include <intrin.h>
+    #include <intrin.h>
 #endif
 
 

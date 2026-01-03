@@ -16,21 +16,22 @@ private:
     std::unique_ptr<QUdpSocket> m_pSocket;
     QTimer                      m_timeoutTimer;
     QDateTime                   m_japanDateTime;
+    QString                     m_ntpServer;
 
 private:
-    void connectToHostWithTimeout(const QString &host, int timeoutMs);
+    quint64 parseNtpTimestamp(const QByteArray &data, int offset);
 
 public:
     explicit NtpTimeFetcher(QObject *parent = nullptr);
-    void fetchTime();
+    void fetchTime(const QString &server = "ntp.nict.jp");
     QDateTime getDateTime() const;
 
 signals:
     void finished();
+    void error(const QString &errorMessage);
 
 private slots:
     void onTimeout();
-    void onConnected();
     void onError(QAbstractSocket::SocketError socketError);
     void readNtpReply();
 };

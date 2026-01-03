@@ -154,12 +154,16 @@ target_compile_definitions(qNewsFlash PRIVATE
     -DQNEWSFLASH_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
+## アーキテクチャ検出とコンパイル設定
 ## ARMまたはAARCH64かどうかを確認
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+    message("ARM architecture detected: ${CMAKE_SYSTEM_PROCESSOR}")
+
     # NEONをサポートする場合 (主に64ビットARM)
     include(CheckCXXCompilerFlag)
     CHECK_CXX_COMPILER_FLAG("-mfpu=neon" COMPILER_SUPPORTS_NEON)
     if(COMPILER_SUPPORTS_NEON)
+        message("  - NEON support enabled")
         target_compile_definitions(qNewsFlash PRIVATE ARM_NEON)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon")
     else()
@@ -168,10 +172,23 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm" OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch
         # 実際にコンパイラがWMMXをサポートしているかどうかを確認する必要がある
         CHECK_CXX_COMPILER_FLAG("-march=armv7-a+simd" COMPILER_SUPPORTS_WMMX)
         if(COMPILER_SUPPORTS_WMMX)
+            message("  - WMMX support enabled")
             target_compile_definitions(qNewsFlash PRIVATE ARM_WMMX)
             set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv7-a+simd")
         endif()
     endif()
+endif()
+
+## RISC-V64アーキテクチャかどうかを確認
+## RISC-V64では、x86のようなTSC命令やARMのようなNEON命令がないため
+## /dev/urandomを使用した暗号論的に安全な乱数生成器を利用します
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "riscv64")
+    message("RISC-V64 architecture detected")
+    message("  - Using /dev/urandom for random number generation")
+    # RISC-V64用のプリプロセッサマクロを定義（将来的な拡張のため）
+    target_compile_definitions(qNewsFlash PRIVATE RISCV64)
+    # RISC-V64では特別なコンパイラフラグは不要
+    # コード内で __riscv および __riscv_xlen マクロを使用してRISC-V64を検出
 endif()
 
 ## バージョン情報
