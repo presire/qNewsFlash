@@ -1,0 +1,19 @@
+{
+  "agents": {
+    "prometheus": {
+      "enabled": true
+    },
+    "hephaestus": {
+      "enabled": true
+    },
+    "librarian": {
+      "enabled": true
+    },
+    "explore": {
+      "enabled": true
+    },
+    "oracle": {
+      "enabled": true
+    }
+  }
+}

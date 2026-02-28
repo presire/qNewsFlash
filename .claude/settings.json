@@ -1,0 +1,81 @@
+{
+  "$schema": "https://claude.ai/schema/settings.json",
+  "project": {
+    "name": "qNewsFlash",
+    "description": "RSS/XPath-based news aggregator for 0ch bulletin boards"
+  },
+  "context": {
+    "maxTokens": 1000000,
+    "includePatterns": [
+      "**/*.{cpp,h,hpp}",
+      "**/CMakeLists.txt",
+      "**/*.cmake",
+      "**/*.json.in",
+      "AGENTS.md",
+      "docs/**/*.md",
+      ".claude/**/*.md"
+    ],
+    "excludePatterns": [
+      "build/**",
+      ".git/**",
+      "*.o",
+      "moc_*",
+      "ui_*",
+      "**/__pycache__/**"
+    ]
+  },
+  "formatting": {
+    "cpp": {
+      "style": "Qt",
+      "indentWidth": 4,
+      "columnLimit": 120
+    }
+  },
+  "hooks": {
+    "preToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Checking file modification...'"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Write(**/*.{cpp,h,hpp,md,json,cmake,txt,in})",
+      "Write(.claude/**)",
+      "Bash(cmake)",
+      "Bash(make)",
+      "Bash(mkdir)",
+      "Bash(git status)",
+      "Bash(git diff)"
+    ],
+    "deny": [
+      "Write(.git/**)",
+      "Bash(rm -rf /)",
+      "Bash(sudo rm)"
+    ]
+  },
+  "skills": {
+    "autoDiscover": true,
+    "paths": [
+      ".claude/skills"
+    ]
+  },
+  "subagents": {
+    "paths": [
+      ".claude/subagents"
+    ]
+  },
+  "rules": {
+    "autoApply": true,
+    "paths": [
+      ".claude/rules"
+    ]
+  }
+}

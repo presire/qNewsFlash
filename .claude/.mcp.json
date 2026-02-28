@@ -1,0 +1,39 @@
+{
+  "$schema": "https://claude.ai/schema/mcp.json",
+  "servers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-filesystem", "/path/to/qNewsFlash"],
+      "env": {}
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp", "--api-key", "Context7のAPIキー"],
+      "env": {}
+    },
+    "grep-app": {
+      "command": "npx",
+      "args": ["-y", "@luminati-io/grep-app-mcp"],
+      "env": {},
+      "description": "Search GitHub for C++/Qt code examples"
+    },
+    "fetch": {
+      "command": "npx",
+      "args": ["mcp-fetch-server"],
+      "env": {
+        "DEFAULT_LIMIT": "50000"
+      }
+    },
+    "websearch": {
+      "command": "npx",
+      "args": ["-y", "@openwebsearch/websearch-mcp"],
+      "env": {},
+      "description": "Web search for Qt/libxml2 documentation"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "env": {}
+    }
+  }
+}
