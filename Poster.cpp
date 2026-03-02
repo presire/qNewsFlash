@@ -390,7 +390,8 @@ QString Poster::convertToShiftJIS(const QString &input)
         }
         else {
             // 変換できない場合は文字参照 (&#xHHHH;) 形式に変換
-            result.append(QString("&#x%1;").arg(currentChar.unicode(), 4, 16, QChar('0')));
+            // result.append(QString("&#x%1;").arg(currentChar.unicode(), 4, 16, QChar('0')));
+            result.append(QString("&#x%1;").arg(static_cast<int>(currentChar.unicode()), 4, 16, QLatin1Char('0')));
         }
     }
 #else
@@ -444,8 +445,10 @@ QString Poster::convertNonSjisToReference(const QString &input)
     QString result;
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    QStringEncoder sjisEncoder(QStringConverter::Encoding::Shift_JIS);
-    QStringDecoder sjisDecoder(QStringConverter::Encoding::Shift_JIS);
+    // QStringEncoder sjisEncoder(QStringConverter::Encoding::Shift_JIS);
+    // QStringDecoder sjisDecoder(QStringConverter::Encoding::Shift_JIS);
+    QStringEncoder sjisEncoder("Shift-JIS");
+    QStringDecoder sjisDecoder("Shift-JIS");
 #else
     QTextCodec* sjisCodec = QTextCodec::codecForName("Shift-JIS");
 #endif
@@ -482,81 +485,87 @@ QString Poster::convertNonSjisToReference(const QString &input)
         }
         else {
             // Shift-JISに変換できない場合は、文字参照形式に変換
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            result.append(QString("&#x%1;").arg(static_cast<int>(ch.unicode()), 4, 16, QLatin1Char('0')));
+#else
             result.append(QString("&#x%1;").arg(ch.unicode(), 4, 16, QChar('0')));
+#endif
         }
     }
 
     return result;
 
     // 異体字セレクタ実装用 (現在は未使用)
-//     QString result;
+#if 0
+    QString result;
 
-// #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-//     QStringEncoder sjisEncoder(QStringConverter::Encoding::Shift_JIS);
-//     QStringDecoder sjisDecoder(QStringConverter::Encoding::Shift_JIS);
-// #else
-//     QTextCodec* sjisCodec = QTextCodec::codecForName("Shift-JIS");
-// #endif
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    QStringEncoder sjisEncoder(QStringConverter::Encoding::Shift_JIS);
+    QStringDecoder sjisDecoder(QStringConverter::Encoding::Shift_JIS);
+#else
+    QTextCodec* sjisCodec = QTextCodec::codecForName("Shift-JIS");
+#endif
 
-//     // 入力文字列を1文字ずつ処理
-//     int i = 0;
-//     while (i < input.length()) {
-//         bool isFC = false;
+    // 入力文字列を1文字ずつ処理
+    int i = 0;
+    while (i < input.length()) {
+        bool isFC = false;
 
-//         // 0xFCのシーケンスをチェック
-// #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-//         QByteArray encoded = sjisEncoder.encode(input.mid(i, 1));
-//         if (!sjisEncoder.hasError() && !encoded.isEmpty() &&
-//             static_cast<unsigned char>(encoded[0]) == 0xFC) {
-//             isFC = true;
-//         }
-// #else
-//         QByteArray encoded = sjisCodec->fromUnicode(input.mid(i, 1));
-//         if (!encoded.isEmpty() && static_cast<unsigned char>(encoded[0]) == 0xFC) {
-//             isFC = true;
-//         }
-// #endif
+        // 0xFCのシーケンスをチェック
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        QByteArray encoded = sjisEncoder.encode(input.mid(i, 1));
+        if (!sjisEncoder.hasError() && !encoded.isEmpty() &&
+            static_cast<unsigned char>(encoded[0]) == 0xFC) {
+            isFC = true;
+        }
+#else
+        QByteArray encoded = sjisCodec->fromUnicode(input.mid(i, 1));
+        if (!encoded.isEmpty() && static_cast<unsigned char>(encoded[0]) == 0xFC) {
+            isFC = true;
+        }
+#endif
 
-//         if (isFC) {
-//             // 0xFCの場合は置換文字列を追加
-//             //result.append("希望の置換文字列を設定");
-//             i++;
-//         }
-//         else {
-//             QString currentChar(input[i]);
-//             bool canConvertToSjis = false;
+        if (isFC) {
+            // 0xFCの場合は置換文字列を追加
+            //result.append("希望の置換文字列を設定");
+            i++;
+        }
+        else {
+            QString currentChar(input[i]);
+            bool canConvertToSjis = false;
 
-//             try {
-// #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-//                 QByteArray sjisEncoded = sjisEncoder.encode(currentChar);
-//                 if (!sjisEncoder.hasError()) {
-//                     QString roundTrip = sjisDecoder.decode(sjisEncoded);
-//                     if (!sjisDecoder.hasError()) {
-//                         canConvertToSjis = (roundTrip == currentChar);
-//                     }
-//                 }
-// #else
-//                 QByteArray sjisEncoded = sjisCodec->fromUnicode(currentChar);
-//                 QString roundTrip = sjisCodec->toUnicode(sjisEncoded);
-//                 canConvertToSjis = (roundTrip == currentChar);
-// #endif
-//             }
-//             catch (...) {
-//                 canConvertToSjis = false;
-//             }
+            try {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+                QByteArray sjisEncoded = sjisEncoder.encode(currentChar);
+                if (!sjisEncoder.hasError()) {
+                    QString roundTrip = sjisDecoder.decode(sjisEncoded);
+                    if (!sjisDecoder.hasError()) {
+                        canConvertToSjis = (roundTrip == currentChar);
+                    }
+                }
+#else
+                QByteArray sjisEncoded = sjisCodec->fromUnicode(currentChar);
+                QString roundTrip = sjisCodec->toUnicode(sjisEncoded);
+                canConvertToSjis = (roundTrip == currentChar);
+#endif
+            }
+            catch (...) {
+                canConvertToSjis = false;
+            }
 
-//             if (canConvertToSjis) {
-//                 result.append(currentChar);
-//             }
-//             else {
-//                 result.append(QString("&#x%1;").arg(currentChar[0].unicode(), 4, 16, QChar('0')));
-//             }
+            if (canConvertToSjis) {
+                result.append(currentChar);
+            }
+            else {
+                result.append(QString("&#x%1;").arg(currentChar[0].unicode(), 4, 16, QChar('0')));
+            }
 
-//             i++;
-//         }
-//     }
+            i++;
+        }
+    }
 
-//     return result;
+    return result;
+#endif
 }
 
 

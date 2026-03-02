@@ -2305,7 +2305,7 @@ int Runner::getConfiguration(QString &filepath)
         m_API               = NewsAPIObject["api"].toString("");      /// News APIのAPIキー
         m_NewsAPIRSS        = NewsAPIObject["rss"].toString("");      /// News APIからニュース記事を取得するためのRSS (URL)
         auto excludes       = NewsAPIObject["exclude"].toArray();     /// 排除する特定メディア
-        for (auto exclude : excludes) {
+        for (auto exclude : std::as_const(excludes)) {
             m_ExcludeMedia.append(exclude.toString());
         }
 
